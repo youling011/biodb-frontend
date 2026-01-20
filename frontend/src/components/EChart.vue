@@ -1,9 +1,9 @@
 <template>
   <div class="chart-wrapper" :style="{ height }">
+    <div ref="elRef" class="chart-canvas"></div>
     <div v-if="!hasData" class="chart-empty">
       <el-empty :description="emptyText" />
     </div>
-    <div v-else ref="elRef" class="chart-canvas"></div>
   </div>
 </template>
 
@@ -36,7 +36,11 @@ const hasData = computed(() => {
 });
 
 function applyOption() {
-  if (!chart || !props.option || !hasData.value) return;
+  if (!chart || !props.option) return;
+  if (!hasData.value) {
+    chart.clear();
+    return;
+  }
   chart.setOption(props.option, { notMerge: true, lazyUpdate: true });
   props.loading ? chart.showLoading() : chart.hideLoading();
 }
@@ -85,10 +89,12 @@ defineExpose({ getInstance });
   height: 100%;
 }
 .chart-empty {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
   min-height: 200px;
+  background: #ffffff;
 }
 </style>
