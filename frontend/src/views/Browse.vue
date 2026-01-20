@@ -17,10 +17,10 @@
           <template #prefix><el-icon><Search /></el-icon></template>
         </el-input>
 
-        <el-select v-model="omicsFilter" placeholder="Omics" clearable style="width: 170px">
+        <el-select v-model="omicsFilter" placeholder="Omics" clearable style="width: 210px">
           <el-option label="Genome" value="GENOME" />
           <el-option label="Transcriptome" value="TRANSCRIPTOME" />
-          <el-option label="Proteome" value="PROTEOME" />
+          <el-option label="Proteome (Coming soon)" value="PROTEOME" disabled />
         </el-select>
 
         <el-button type="primary" @click="refresh" :loading="loading">Refresh</el-button>
