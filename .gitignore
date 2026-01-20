@@ -1,0 +1,35 @@
+@"
+# Node
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Django / runtime
+*.sqlite3
+media/
+staticfiles/
+
+# logs
+*.log
+"@ | Set-Content -Encoding UTF8 .gitignore
