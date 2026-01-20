@@ -66,7 +66,7 @@ import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { buildBarOption, buildBoxplotOption } from "../shared/echartsKit";
 import { boxplotStats, groupBy, isFiniteNumber, mean } from "../shared/stats";
-import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../shared/showcaseKit";
+import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";
 
 // Showcase-first tab: self-generates data + options + table schema.
 const props = defineProps({

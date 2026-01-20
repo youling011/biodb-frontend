@@ -125,7 +125,7 @@ import { computed, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { safeNum, extractDinucMatrix, extractTopTrinuc, round } from "./transcriptomeUtils";
-import { makeTranscriptomeRows } from "../shared/showcaseKit";
+import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
 
 const props = defineProps({
   seed: { type: String, default: "TX:demo" },
