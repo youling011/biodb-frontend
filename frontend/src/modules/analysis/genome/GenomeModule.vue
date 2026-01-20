@@ -85,7 +85,7 @@ import FingerprintMap from "./FingerprintMap.vue";
 import ExportApi from "./ExportApi.vue";
 import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
-import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../shared/showcaseKit";
+import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";
 
 const props = defineProps({
   sampleId: { type: [String, Number], required: true },

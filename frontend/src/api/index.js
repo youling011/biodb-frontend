@@ -14,25 +14,18 @@ import { reactive } from "vue";
 import { http } from "./http";
 import { mockSpeciesAnalysis, mockMultiScreening } from "../mock/demoData";
 
-const DEMO_MODE = String(import.meta.env.VITE_DEMO_MODE || "")
+const DATA_MODE = String(import.meta.env.VITE_DATA_MODE || "demo")
   .trim()
   .toLowerCase();
 
-// Strategy 2 (per user request): always use demo data for UI showcasing,
-// regardless of backend availability. You may override by setting
-// VITE_FORCE_DEMO=0 in a future deployment scenario.
-const FORCE_DEMO = String(import.meta.env.VITE_FORCE_DEMO || "0")
-  .trim()
-  .toLowerCase();
-const USE_FORCE_DEMO = FORCE_DEMO === "1" || FORCE_DEMO === "true" || FORCE_DEMO === "yes";
-const USE_DEMO = USE_FORCE_DEMO || DEMO_MODE === "1" || DEMO_MODE === "true" || DEMO_MODE === "yes";
-const DEMO_MESSAGE = USE_FORCE_DEMO ? "FORCE_DEMO=true" : "DEMO_MODE=true";
+const USE_DEMO = DATA_MODE !== "backend";
+const DEMO_MESSAGE = USE_DEMO ? `DATA_MODE=${DATA_MODE}` : null;
 
 // Export a minimal global state so the UI can surface "demo_fallback" vs "demo_mode" vs "backend".
 // (A dedicated store is a recommended follow-up; this is kept minimal and non-invasive.)
 export const dataSourceState = reactive({
   source: USE_DEMO ? "demo_mode" : "backend", // backend | demo_mode | demo_fallback
-  message: USE_DEMO ? DEMO_MESSAGE : null,
+  message: DEMO_MESSAGE,
   last_error: null,
   last_updated_at: Date.now(),
 });
@@ -42,6 +35,16 @@ function markSource(source, message = null, err = null) {
   dataSourceState.message = message;
   dataSourceState.last_error = err ? String(err?.message || err) : null;
   dataSourceState.last_updated_at = Date.now();
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function demoDelay() {
+  if (USE_DEMO) {
+    await delay(150);
+  }
 }
 
 // Keep the species list consistent with backend DEFAULT_SPECIES (10).
@@ -482,17 +485,38 @@ function demoObservedStats(id, params = {}, source = "demo_mode") {
 
 // 样本列表
 export async function getSamples(params = {}) {
+  const {
+    q = "",
+    omics = "",
+    limit = 20,
+    offset = 0,
+  } = params || {};
+
   if (USE_DEMO) {
     markSource("demo_mode", DEMO_MESSAGE);
-    return DEMO_SAMPLES;
+    await demoDelay();
+    const query = String(q || "").trim().toLowerCase();
+    const list = DEMO_SAMPLES.filter((s) => {
+      if (omics && s.omics_type !== omics) return false;
+      if (!query) return true;
+      const hay = `${s.species_name} ${s.taxonomy} ${s.omics_type}`.toLowerCase();
+      return hay.includes(query);
+    });
+    const items = list.slice(Number(offset) || 0, (Number(offset) || 0) + (Number(limit) || 20));
+    return { items, total: list.length, limit: Number(limit) || 20, offset: Number(offset) || 0 };
   }
+
   try {
-    const { data } = await http.get("/stoichiometry/", { params });
+    const { data } = await http.get("/stoichiometry/", { params: { q, omics, limit, offset } });
     markSource("backend");
-    return normalizeSampleList(data);
+    const list = normalizeSampleList(Array.isArray(data?.items) ? data.items : data);
+    const total = Number(data?.total ?? list.length);
+    return { items: list, total, limit: Number(limit) || 20, offset: Number(offset) || 0 };
   } catch (e) {
     markSource("demo_fallback", "Backend unavailable. Using deterministic demo fallback.", e);
-    return DEMO_SAMPLES;
+    const list = DEMO_SAMPLES;
+    const items = list.slice(Number(offset) || 0, (Number(offset) || 0) + (Number(limit) || 20));
+    return { items, total: list.length, limit: Number(limit) || 20, offset: Number(offset) || 0 };
   }
 }
 
@@ -500,6 +524,7 @@ export async function getSamples(params = {}) {
 export async function getSample(id) {
   if (USE_DEMO) {
     markSource("demo_mode", DEMO_MESSAGE);
+    await demoDelay();
     return findDemoSample(id);
   }
   try {
@@ -512,10 +537,34 @@ export async function getSample(id) {
   }
 }
 
+export async function getSpeciesOmics(sampleId) {
+  const sample = await getSample(sampleId);
+  if (!sample?.species_name) {
+    return { GENOME: null, TRANSCRIPTOME: null, PROTEOME: null };
+  }
+  if (USE_DEMO) {
+    const same = DEMO_SAMPLES.filter((s) => s.species_name === sample.species_name);
+    return {
+      GENOME: same.find((s) => s.omics_type === "GENOME")?.id || null,
+      TRANSCRIPTOME: same.find((s) => s.omics_type === "TRANSCRIPTOME")?.id || null,
+      PROTEOME: same.find((s) => s.omics_type === "PROTEOME")?.id || null,
+    };
+  }
+
+  const response = await getSamples({ q: sample.species_name, limit: 200, offset: 0 });
+  const same = response.items || [];
+  return {
+    GENOME: same.find((s) => s.omics_type === "GENOME")?.id || null,
+    TRANSCRIPTOME: same.find((s) => s.omics_type === "TRANSCRIPTOME")?.id || null,
+    PROTEOME: same.find((s) => s.omics_type === "PROTEOME")?.id || null,
+  };
+}
+
 // 单样本分析（legacy keys + contract envelope)
 export async function getSpeciesAnalysis(id, params = { omics: "GENOME" }) {
   if (USE_DEMO) {
     markSource("demo_mode", DEMO_MESSAGE);
+    await demoDelay();
     return demoSpeciesAnalysis(id, params, "demo_mode");
   }
   try {
@@ -534,6 +583,7 @@ export async function getSpeciesAnalysis(id, params = { omics: "GENOME" }) {
 export async function getObservedStats(id, params = { omics: "GENOME" }) {
   if (USE_DEMO) {
     markSource("demo_mode", DEMO_MESSAGE);
+    await demoDelay();
     return demoObservedStats(id, params, "demo_mode");
   }
   try {
@@ -553,6 +603,7 @@ export async function getSampleRows(
 ) {
   if (USE_DEMO) {
     markSource("demo_mode", DEMO_MESSAGE);
+    await demoDelay();
     return demoRows(id, params, "demo_mode");
   }
   try {
@@ -569,6 +620,7 @@ export async function getSampleRows(
 export async function runMultiScreening(payload) {
   if (USE_DEMO) {
     markSource("demo_mode", DEMO_MESSAGE);
+    await demoDelay();
     const out = mockMultiScreening({ payload, seed: "DEMO" });
     return withMetaSource(out, "demo_mode", { status: "demo" });
   }
@@ -600,6 +652,7 @@ export async function getGlobalStats() {
 
   if (USE_DEMO) {
     markSource("demo_mode", DEMO_MESSAGE);
+    await demoDelay();
     return withMetaSource(demoStats(), "demo_mode", { status: "demo", kind: "global_stats" });
   }
 
@@ -616,6 +669,7 @@ export async function getGlobalStats() {
 export default {
   getSamples,
   getSample,
+  getSpeciesOmics,
   getSpeciesAnalysis,
   getObservedStats,
   getSampleRows,

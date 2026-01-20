@@ -67,7 +67,7 @@ import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { buildHeatmapOption, buildScatterOption } from "../shared/echartsKit";
 import { groupBy, isFiniteNumber, mean } from "../shared/stats";
 import { pca } from "../shared/pca";
-import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../shared/showcaseKit";
+import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";
 import { safeNum } from "./genomeUtils";
 
 const props = defineProps({

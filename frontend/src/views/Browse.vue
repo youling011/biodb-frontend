@@ -37,7 +37,7 @@
       </div>
 
       <el-table
-        :data="filteredData"
+        :data="raw"
         stripe
         style="width: 100%"
         v-loading="loading"
@@ -45,23 +45,23 @@
         @row-dblclick="(row) => goToDetail(row.id)"
       >
         <el-table-column type="selection" width="52" />
-        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="id" label="ID" width="80" show-overflow-tooltip />
 
-        <el-table-column prop="species_name" label="Species Name" min-width="220" />
+        <el-table-column prop="species_name" label="Species Name" min-width="220" show-overflow-tooltip />
 
-        <el-table-column prop="taxonomy" label="Taxonomy" width="140">
+        <el-table-column prop="taxonomy" label="Taxonomy" width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <el-tag effect="plain">{{ row.taxonomy }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column prop="omics_type" label="Omics Type" width="140">
+        <el-table-column prop="omics_type" label="Omics Type" width="140" show-overflow-tooltip>
           <template #default="{ row }">
             <el-tag :type="omicsTagType(row.omics_type)">{{ row.omics_type }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="Summary" min-width="320">
+        <el-table-column label="Summary" min-width="320" show-overflow-tooltip>
           <template #default="{ row }">
             <span style="color:#606266">
               genes: <b>{{ row.gene_count ?? row.summary_stats?.planned?.n_rows ?? '-' }}</b>,
@@ -78,6 +78,18 @@
         </el-table-column>
       </el-table>
 
+      <div class="pagination">
+        <el-pagination
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next"
+          :total="total"
+          @size-change="onPageSizeChange"
+          @current-change="onPageChange"
+        />
+      </div>
+
       <div class="footer-note">
         Double-click a row to open detail. If backend is empty/unavailable, demo data will be generated automatically.
       </div>
@@ -86,7 +98,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { getSamples } from "../api";
 
@@ -94,6 +106,9 @@ const router = useRouter();
 
 const loading = ref(false);
 const raw = ref([]);
+const total = ref(0);
+const pageSize = ref(20);
+const currentPage = ref(1);
 
 const filterText = ref("");
 const omicsFilter = ref("");
@@ -105,17 +120,6 @@ function omicsTagType(v) {
   if (v === "PROTEOME") return "info";
   return "";
 }
-
-const filteredData = computed(() => {
-  const q = filterText.value.trim().toLowerCase();
-  return (raw.value || [])
-    .filter((r) => (omicsFilter.value ? r.omics_type === omicsFilter.value : true))
-    .filter((r) => {
-      if (!q) return true;
-      const s = `${r.species_name || ""} ${r.taxonomy || ""} ${r.omics_type || ""}`.toLowerCase();
-      return s.includes(q);
-    });
-});
 
 function onSelectionChange(rows) {
   selectedRows.value = rows || [];
@@ -134,13 +138,36 @@ function goToCompare() {
 async function refresh() {
   loading.value = true;
   try {
-    raw.value = await getSamples();
+    const response = await getSamples({
+      q: filterText.value,
+      omics: omicsFilter.value,
+      limit: pageSize.value,
+      offset: (currentPage.value - 1) * pageSize.value,
+    });
+    raw.value = response.items || [];
+    total.value = response.total || 0;
   } finally {
     loading.value = false;
   }
 }
 
+function onPageSizeChange(size) {
+  pageSize.value = size;
+  currentPage.value = 1;
+  refresh();
+}
+
+function onPageChange(page) {
+  currentPage.value = page;
+  refresh();
+}
+
 onMounted(refresh);
+
+watch([filterText, omicsFilter], () => {
+  currentPage.value = 1;
+  refresh();
+});
 </script>
 
 <style scoped>
@@ -148,5 +175,6 @@ onMounted(refresh);
 .header { margin-bottom: 16px; }
 .table-card { border-radius: 10px; }
 .filter-bar { margin-bottom: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pagination { margin-top: 12px; display: flex; justify-content: flex-end; }
 .footer-note { margin-top: 10px; color: #909399; font-size: 12px; }
 </style>
