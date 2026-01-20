@@ -48,8 +48,8 @@
               <el-icon :size="28" color="#E6A23C"><Files /></el-icon>
             </div>
             <div class="text-wrapper">
-              <div class="stat-val">{{ stats.protein_count }}</div>
-              <div class="stat-label">Proteins</div>
+            <div class="stat-val">{{ formatStat(stats.protein_count) }}</div>
+            <div class="stat-label">Proteins (Coming soon)</div>
             </div>
           </div>
         </el-col>
@@ -100,9 +100,14 @@ const searchKey = ref("");
 const stats = ref({
   species_count: "-",
   gene_count: "-",
-  protein_count: "-",
+  protein_count: null,
   monomer_count: "-",
 });
+
+function formatStat(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  return value;
+}
 
 function goToBrowse() {
   router.push({ path: "/browse", query: { q: searchKey.value } });

@@ -38,7 +38,7 @@ import EChart from "../../../components/EChart.vue";
 
 import { buildHeatmapOption, buildScatterOption, buildHistOption } from "../shared/echartsKit";
 import { mean } from "../shared/stats";
-import { makeTranscriptomeRows, ShowcaseTxConsts } from "../shared/showcaseKit";
+import { makeTranscriptomeRows, ShowcaseTxConsts } from "../../../api/showcaseAdapter";
 import { safeNum, round } from "./transcriptomeUtils";
 
 const props = defineProps({

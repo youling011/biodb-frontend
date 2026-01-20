@@ -171,13 +171,15 @@ const ready = computed(() => {
   return groupA.value.length > 0 && groupB.value.length > 0;
 });
 
+const omicsSamples = computed(() => (props.samples || []).filter((s) => s.omics_type === props.omics));
+
 const groupAOptions = computed(() => {
   const b = new Set(groupB.value);
-  return (props.samples || []).filter((s) => !b.has(s.id));
+  return omicsSamples.value.filter((s) => !b.has(s.id));
 });
 const groupBOptions = computed(() => {
   const a = new Set(groupA.value);
-  return (props.samples || []).filter((s) => !a.has(s.id));
+  return omicsSamples.value.filter((s) => !a.has(s.id));
 });
 
 function isSig(r) {
