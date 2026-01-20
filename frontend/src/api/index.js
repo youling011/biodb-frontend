@@ -21,7 +21,7 @@ const DEMO_MODE = String(import.meta.env.VITE_DEMO_MODE || "")
 // Strategy 2 (per user request): always use demo data for UI showcasing,
 // regardless of backend availability. You may override by setting
 // VITE_FORCE_DEMO=0 in a future deployment scenario.
-const FORCE_DEMO = String(import.meta.env.VITE_FORCE_DEMO || "1")
+const FORCE_DEMO = String(import.meta.env.VITE_FORCE_DEMO || "0")
   .trim()
   .toLowerCase();
 const USE_FORCE_DEMO = FORCE_DEMO === "1" || FORCE_DEMO === "true" || FORCE_DEMO === "yes";
@@ -594,7 +594,7 @@ export async function getGlobalStats() {
   const demoStats = () => ({
     species_count: DEMO_SPECIES.length,
     gene_count: DEMO_SAMPLES.filter((s) => s.omics_type === "GENOME").reduce((a, b) => a + (b.gene_count || 0), 0),
-    protein_count: 0,
+    protein_count: null,
     monomer_count: DEMO_SAMPLES.reduce((a, b) => a + (b.gene_count || 0), 0),
   });
 
