@@ -141,7 +141,7 @@ import { computed, ref } from "vue";
 import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 
-import { makeTranscriptomeRows } from "../shared/showcaseKit";
+import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
 import { buildScatterOption, buildHistOption, buildBoxplotOption } from "../shared/echartsKit";
 import { mean, pearson, cleanNumbers, boxplotStats } from "../shared/stats";
 import { safeNum, round } from "./transcriptomeUtils";

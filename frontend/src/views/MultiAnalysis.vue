@@ -59,8 +59,8 @@ const prefillGroupA = ref([]);
 async function loadSamples() {
   loading.value = true;
   try {
-    const data = await getSamples();
-    samples.value = Array.isArray(data) ? data : [];
+    const data = await getSamples({ limit: 200, offset: 0 });
+    samples.value = Array.isArray(data?.items) ? data.items : [];
   } finally {
     loading.value = false;
   }

@@ -3,7 +3,7 @@
 // - Keep legacy helpers intact (safeNum/safeDiv/histogram/extractPrefixedProportions/etc.)
 // - Add showcase helpers to generate local rows deterministically when backend data is absent.
 
-import { hashStringToUint32, makeGenomeRows } from "../shared/showcaseKit";
+import { hashStringToUint32, makeGenomeRows } from "../../../api/showcaseAdapter";
 
 export function safeNum(x, dflt = 0) {
   const v = Number(x);

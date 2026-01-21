@@ -90,7 +90,7 @@ import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { buildScatterOption, buildHistOption } from "../shared/echartsKit";
 import { groupBy, isFiniteNumber } from "../shared/stats";
-import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../shared/showcaseKit";
+import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";
 import { histogram, safeDiv, safeNum } from "./genomeUtils";
 
 const props = defineProps({

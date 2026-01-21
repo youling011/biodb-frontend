@@ -173,7 +173,7 @@
 import { computed, ref } from "vue";
 import EChart from "../../../components/EChart.vue";
 
-import { makeTranscriptomeRows } from "../shared/showcaseKit";
+import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
 import { buildBarOption, buildHistOption, buildBoxplotOption, buildHeatmapOption } from "../shared/echartsKit";
 import { boxplotStats, cleanNumbers, mean, pearson, quantile, toNumber } from "../shared/stats";
 
