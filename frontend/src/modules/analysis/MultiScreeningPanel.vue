@@ -96,9 +96,18 @@
                 <EChart ref="volcanoRef" :option="volcanoOption" height="360px" />
               </el-card>
             </el-col>
-
             <el-col :span="10">
-              <el-card shadow="never" header="PCA / Scatter">
+              <el-card shadow="never">
+                <template #header>
+                  <div class="card-header">
+                    <span>PCA</span>
+                    <div class="hdr-actions">
+                      <el-button text @click="exportChart(pcaRef, `${omics}_pca.png`)">
+                        <el-icon><Download /></el-icon>
+                      </el-button>
+                    </div>
+                  </div>
+                </template>
                 <EChart ref="pcaRef" :option="pcaOption" height="360px" />
               </el-card>
             </el-col>
@@ -107,13 +116,11 @@
           <el-card shadow="never">
             <template #header>
               <div class="card-header">
-                <span>Differential List</span>
+                <span>Diff Features</span>
                 <div class="hdr-actions">
-                  <el-input v-model="kw" clearable placeholder="Filter feature…" style="width: 220px">
-                    <template #prefix><el-icon><Search /></el-icon></template>
-                  </el-input>
-                  <el-button type="primary" icon="Download" @click="exportCsv">Export CSV</el-button>
-                  <el-button @click="copyLink">Share</el-button>
+                  <el-input v-model="kw" placeholder="Search gene" clearable style="width: 220px" />
+                  <el-button @click="exportCsv">Export CSV</el-button>
+                  <el-button type="primary" @click="copyLink">Share Link</el-button>
                 </div>
               </div>
             </template>
