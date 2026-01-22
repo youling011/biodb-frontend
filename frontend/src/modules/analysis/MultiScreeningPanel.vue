@@ -197,6 +197,8 @@ const featureOptions = computed(() => {
   return ["GC_Content_Percent", "C_N_Ratio", "Length_bp", "Nitrogen_Atoms", "Carbon_Atoms"];
 });
 
+const omicsSamples = computed(() => (props.samples || []).filter((s) => s.omics_type === props.omics));
+
 const groupAOptions = computed(() => {
   const b = new Set(groupB.value);
   return omicsSamples.value.filter((s) => !b.has(s.id));
