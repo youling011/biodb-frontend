@@ -60,7 +60,7 @@ import { safeNum, round } from "./transcriptomeUtils";
 import { pca } from "../shared/pca";
 import { buildScatterOption, buildHeatmapOption } from "../shared/echartsKit";
 import { variance, mean, toNumber } from "../shared/stats";
-import { makeTranscriptomeRows } from "../shared/showcaseKit";
+import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
 
 const props = defineProps({
   seed: { type: String, default: "TX:demo" },

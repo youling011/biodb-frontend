@@ -6,6 +6,8 @@
         <el-tag effect="plain">showcase mode (front-end synthetic data)</el-tag>
       </div>
       <div class="actions">
+        <el-button @click="dictionaryOpen = true">Data Dictionary</el-button>
+        <el-button @click="provenanceOpen = true">Provenance</el-button>
         <el-button type="primary" plain @click="reload">Refresh</el-button>
       </div>
     </div>
@@ -36,6 +38,15 @@
       </el-tab-pane>
     </el-tabs>
   </div>
+  <FeatureDictionaryDrawer v-model="dictionaryOpen" omics="TRANSCRIPTOME" />
+  <ProvenancePanel
+    v-model="provenanceOpen"
+    :mode="dataSourceState.source"
+    :api-base="apiBase"
+    :sample-id="props.sampleId"
+    :seed="seed"
+    :params="{ tab }"
+  />
 </template>
 
 <script setup>
@@ -47,6 +58,9 @@ import BiasAnalysis from "./BiasAnalysis.vue";
 import ComplexityMotif from "./ComplexityMotif.vue";
 import TranscriptFingerprintMap from "./TranscriptFingerprintMap.vue";
 import ExportApi from "./ExportApi.vue";
+import FeatureDictionaryDrawer from "../../../components/FeatureDictionaryDrawer.vue";
+import ProvenancePanel from "../../../components/ProvenancePanel.vue";
+import { dataSourceState } from "../../../api";
 
 const props = defineProps({
   sampleId: { type: [String, Number], default: "demo" },
@@ -54,6 +68,9 @@ const props = defineProps({
 });
 
 const tab = ref("overview");
+const dictionaryOpen = ref(false);
+const provenanceOpen = ref(false);
+const apiBase = String(import.meta.env.VITE_API_BASE_URL || "");
 
 // One shared seed + bump: each tab deterministically regenerates its own charts/tables.
 const seedBump = ref(0);
