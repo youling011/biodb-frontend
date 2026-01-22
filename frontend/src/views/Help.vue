@@ -11,6 +11,9 @@
       <el-collapse-item title="How to cite this database?" name="3">
         <div class="content">Please cite: <i>BioStoichDB Consortium. A biological stoichiometry database for multi-omics analysis. Nucleic Acids Res. 2026.</i></div>
       </el-collapse-item>
+      <el-collapse-item title="How to share a reproducible link?" name="4">
+        <div class="content">Filters, tabs, and analysis parameters are stored in the URL. Copy the browser address bar to share or reproduce the same view.</div>
+      </el-collapse-item>
     </el-collapse>
   </div>
 </template>

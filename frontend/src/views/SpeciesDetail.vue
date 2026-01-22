@@ -46,6 +46,7 @@
 <script setup>
 import { ref, onMounted, watch } from "vue";
 import { getSample, getSpeciesOmics } from "../api";
+import { getQueryString, setQueryValues } from "../utils/urlState";
 
 import GenomeAnalysis from "../modules/analysis/GenomeAnalysis.vue";
 import TranscriptomeAnalysis from "../modules/analysis/TranscriptomeAnalysis.vue";
@@ -66,7 +67,7 @@ const omicsIds = ref({
   PROTEOME: null,
 });
 
-const omicsTab = ref("GENOME");
+const omicsTab = ref(getQueryString("omics", "GENOME"));
 
 async function resolveOmicsIds() {
   if (!sample.value?.id) {
@@ -111,6 +112,10 @@ watch(
   () => sample.value?.species_name,
   () => resolveOmicsIds()
 );
+
+watch(omicsTab, () => {
+  setQueryValues({ omics: omicsTab.value });
+});
 </script>
 
 <style scoped>

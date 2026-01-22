@@ -7,6 +7,8 @@
         <el-tag v-if="sourceTag" effect="plain" type="info">{{ sourceTag }}</el-tag>
       </div>
       <div class="actions">
+        <el-button @click="dictionaryOpen = true">Data Dictionary</el-button>
+        <el-button @click="provenanceOpen = true">Provenance</el-button>
         <el-button icon="Refresh" @click="reload">Refresh</el-button>
       </div>
     </div>
@@ -73,6 +75,16 @@
       </el-tab-pane>
     </el-tabs>
   </div>
+  <FeatureDictionaryDrawer v-model="dictionaryOpen" omics="GENOME" />
+  <ProvenancePanel
+    v-model="provenanceOpen"
+    :mode="dataSourceState.source"
+    :api-base="apiBase"
+    :sample-id="props.sampleId"
+    :seed="seed"
+    :rows-count="rows.length"
+    :params="{ tab }"
+  />
 </template>
 
 <script setup>
@@ -86,6 +98,9 @@ import ExportApi from "./ExportApi.vue";
 import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";
+import FeatureDictionaryDrawer from "../../../components/FeatureDictionaryDrawer.vue";
+import ProvenancePanel from "../../../components/ProvenancePanel.vue";
+import { dataSourceState } from "../../../api";
 
 const props = defineProps({
   sampleId: { type: [String, Number], required: true },
@@ -93,6 +108,9 @@ const props = defineProps({
 });
 
 const tab = ref("overview");
+const dictionaryOpen = ref(false);
+const provenanceOpen = ref(false);
+const apiBase = String(import.meta.env.VITE_API_BASE_URL || "");
 
 // Showcase mode for the Genome module (front-end only):
 // - rows/categories are generated locally (deterministic by sampleId + seedBump)

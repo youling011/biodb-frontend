@@ -14,20 +14,35 @@ import { reactive } from "vue";
 import { http } from "./http";
 import { mockSpeciesAnalysis, mockMultiScreening } from "../mock/demoData";
 
-const DATA_MODE = String(import.meta.env.VITE_DATA_MODE || "demo")
+const MODE_STORAGE_KEY = "biostoich_data_mode";
+const ENV_DATA_MODE = String(import.meta.env.VITE_DATA_MODE || "demo")
   .trim()
   .toLowerCase();
 
-const USE_DEMO = DATA_MODE !== "backend";
-const DEMO_MESSAGE = USE_DEMO ? `DATA_MODE=${DATA_MODE}` : null;
+function readStoredMode() {
+  try {
+    return String(localStorage.getItem(MODE_STORAGE_KEY) || "").trim().toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function resolveMode() {
+  const stored = readStoredMode();
+  return stored || ENV_DATA_MODE;
+}
 
 // Export a minimal global state so the UI can surface "demo_fallback" vs "demo_mode" vs "backend".
 // (A dedicated store is a recommended follow-up; this is kept minimal and non-invasive.)
+const INITIAL_MODE = resolveMode();
+
 export const dataSourceState = reactive({
-  source: USE_DEMO ? "demo_mode" : "backend", // backend | demo_mode | demo_fallback
-  message: DEMO_MESSAGE,
+  mode: INITIAL_MODE,
+  source: INITIAL_MODE !== "backend" ? "demo_mode" : "backend", // backend | demo_mode | demo_fallback
+  message: INITIAL_MODE !== "backend" ? `DATA_MODE=${INITIAL_MODE}` : null,
   last_error: null,
   last_updated_at: Date.now(),
+  api_base: String(import.meta.env.VITE_API_BASE_URL || ""),
 });
 
 function markSource(source, message = null, err = null) {
@@ -42,9 +57,20 @@ function delay(ms) {
 }
 
 async function demoDelay() {
-  if (USE_DEMO) {
+  if (dataSourceState.mode !== "backend") {
     await delay(150);
   }
+}
+
+export function setDataMode(mode) {
+  const normalized = String(mode || "demo").trim().toLowerCase();
+  try {
+    localStorage.setItem(MODE_STORAGE_KEY, normalized);
+  } catch {}
+  dataSourceState.mode = normalized;
+  dataSourceState.source = normalized === "backend" ? "backend" : "demo_mode";
+  dataSourceState.message = normalized === "backend" ? null : `DATA_MODE=${normalized}`;
+  dataSourceState.last_updated_at = Date.now();
 }
 
 // Keep the species list consistent with backend DEFAULT_SPECIES (10).
@@ -88,13 +114,13 @@ function round(x, d = 3) {
 }
 
 function buildDemoSamples() {
-  // Exactly: 10 species × 2 omics = 20 samples. Proteome is intentionally omitted.
+  // Exactly: 10 species × 3 omics = 30 samples for demo.
   const samples = [];
   let id = 1;
   for (const sp of DEMO_SPECIES) {
-    for (const omics of ["GENOME", "TRANSCRIPTOME"]) {
+    for (const omics of ["GENOME", "TRANSCRIPTOME", "PROTEOME"]) {
       const r = rngFrom(`${sp.tag}:${omics}`);
-      const planned = omics === "GENOME" ? 4494 : 4412;
+      const planned = omics === "GENOME" ? 4494 : omics === "TRANSCRIPTOME" ? 4412 : 3200;
       const gc = round(35 + r() * 30, 2);
       const cn = round(2.8 + r() * 4.2, 3);
       samples.push({
@@ -193,145 +219,25 @@ function buildSpeciesAnalysisEnvelope({
     contract,
     source,
   };
-  const rows = {
-    items: Array.isArray(items) ? items : [],
-    pagination: pagination || {},
-    fields,
-  };
-  const derived = {
-    charts: charts || {},
-    tables: tables || {},
-  };
-  // Legacy keys (keep UI compatibility)
   return {
     meta,
-    rows,
-    derived,
-    species_info: sample
-      ? {
-          id: sample.id,
-          species_name: sample.species_name,
-          taxonomy: sample.taxonomy,
-          omics_type: omics,
-        }
-      : null,
-    raw_data_sample: Array.isArray(items) ? items : [],
-    charts: charts || {},
-    tables: tables || {},
-    pagination: pagination || {},
+    items,
+    charts,
+    tables,
+    pagination,
   };
-}
-
-function normalizeSpeciesAnalysisResponse(data, id, params, source) {
-  const omics = String(params?.omics || "GENOME").toUpperCase();
-  const obj = safeObj(data);
-
-  // Prefer backend's contract envelope when present.
-  const meta = safeObj(obj.meta);
-  const rowsEnvelope = safeObj(obj.rows);
-  const derivedEnvelope = safeObj(obj.derived);
-
-  const legacyRaw = Array.isArray(obj.raw_data_sample)
-    ? obj.raw_data_sample
-    : Array.isArray(rowsEnvelope.items)
-      ? rowsEnvelope.items
-      : [];
-
-  const legacyPagination = safeObj(obj.pagination);
-  const pagination = Object.keys(legacyPagination).length
-    ? legacyPagination
-    : safeObj(rowsEnvelope.pagination);
-
-  const charts = safeObj(obj.charts);
-  const tables = safeObj(obj.tables);
-
-  const derived = Object.keys(derivedEnvelope).length
-    ? {
-        ...derivedEnvelope,
-        charts: derivedEnvelope.charts || charts,
-        tables: derivedEnvelope.tables || tables,
-      }
-    : { charts, tables };
-
-  const rows = Object.keys(rowsEnvelope).length
-    ? {
-        ...rowsEnvelope,
-        items: Array.isArray(rowsEnvelope.items) ? rowsEnvelope.items : legacyRaw,
-        pagination: rowsEnvelope.pagination || pagination,
-        fields: rowsEnvelope.fields || meta.fields || (legacyRaw[0] ? Object.keys(legacyRaw[0]) : []),
-      }
-    : {
-        items: legacyRaw,
-        pagination,
-        fields: meta.fields || (legacyRaw[0] ? Object.keys(legacyRaw[0]) : []),
-      };
-
-  const normalized = {
-    ...obj,
-    meta: {
-      sample_id: meta.sample_id ?? Number(id),
-      omics: meta.omics || omics,
-      status: meta.status || "ok",
-      message: meta.message || null,
-      ...meta,
-      source: meta.source || source,
-    },
-    rows,
-    derived,
-
-    // Keep legacy keys for current UI
-    species_info: obj.species_info || null,
-    raw_data_sample: legacyRaw,
-    charts: charts,
-    tables: tables,
-    pagination: pagination,
-  };
-
-  return normalized;
 }
 
 function normalizeRowsEndpointResponse(data, id, params, source) {
-  const omics = String(params?.omics || "GENOME").toUpperCase();
-  const obj = safeObj(data);
-  const meta = safeObj(obj.meta);
+  const rows = Array.isArray(data?.rows) ? data.rows : Array.isArray(data) ? data : [];
+  const rows_v2 = Array.isArray(data?.rows_v2) ? data.rows_v2 : [];
+  const meta = safeObj(data?.meta);
+  const derived = safeObj(data?.derived);
 
-  // Legacy: UI expects data.rows to be an array.
-  const rowsArray = Array.isArray(obj.rows)
-    ? obj.rows
-    : Array.isArray(obj.rows_v2?.items)
-      ? obj.rows_v2.items
-      : [];
-
-  const pagination = Object.keys(safeObj(obj.pagination)).length
-    ? safeObj(obj.pagination)
-    : safeObj(obj.rows_v2?.pagination);
-
-  const fields = meta.fields || (rowsArray[0] ? Object.keys(rowsArray[0]) : []);
-
-  const rows_v2 = safeObj(obj.rows_v2);
-  const rowsV2 = Object.keys(rows_v2).length
-    ? {
-        ...rows_v2,
-        items: Array.isArray(rows_v2.items) ? rows_v2.items : rowsArray,
-        pagination: rows_v2.pagination || pagination,
-        fields: rows_v2.fields || fields,
-      }
-    : { items: rowsArray, pagination, fields };
-
-  return {
-    ...obj,
-    meta: {
-      sample_id: meta.sample_id ?? Number(id),
-      omics: meta.omics || omics,
-      status: meta.status || "ok",
-      message: meta.message || null,
-      ...meta,
-      source: meta.source || source,
-    },
-    rows: rowsArray,
-    pagination,
-    rows_v2: rowsV2,
-  };
+  if (rows.length === 0 && rows_v2.length > 0) {
+    return { rows: rows_v2, rows_v2, meta: { ...meta, source }, derived };
+  }
+  return { rows, rows_v2, meta: { ...meta, source }, derived };
 }
 
 function demoSpeciesAnalysis(id, params = {}, source = "demo_mode") {
@@ -366,9 +272,27 @@ function demoSpeciesAnalysis(id, params = {}, source = "demo_mode") {
     status: source === "demo_mode" ? "demo" : "fallback",
     message:
       source === "demo_fallback"
-        ? "Backend unavailable. Using deterministic demo fallback." 
-        : DEMO_MESSAGE,
+        ? "Backend unavailable. Using deterministic demo fallback."
+        : dataSourceState.message,
   });
+}
+
+function demoObservedStats(id, params = {}, source = "demo_mode") {
+  const omics = String(params?.omics || "GENOME").toUpperCase();
+  const sample = findDemoSample(id);
+
+  return withMetaSource(
+    {
+      summary_stats: {
+        observed: {
+          gc_content: { mean: sample?.avg_gc ?? 0.45, std: 0.05 },
+          ratios: { C_N_Ratio: { mean: sample?.avg_cn_ratio ?? 3.2, std: 0.4 } },
+        },
+      },
+    },
+    source,
+    { status: source === "demo_mode" ? "demo" : "fallback", omics }
+  );
 }
 
 function demoRows(id, params = {}, source = "demo_mode") {
@@ -405,95 +329,67 @@ function demoRows(id, params = {}, source = "demo_mode") {
       meta: { status: source === "demo_mode" ? "demo" : "fallback" },
       rows: page,
       pagination,
-      rows_v2: { items: page, pagination },
     },
     id,
-    { omics },
+    params,
     source
   );
 }
 
-function demoObservedStats(id, params = {}, source = "demo_mode") {
-  const omics = String(params?.omics || "GENOME").toUpperCase();
-  const sample = findDemoSample(id);
-  const planned = sample?.gene_count ?? (omics === "GENOME" ? 4494 : 4412);
-
-  // Lightweight: reuse mockSpeciesAnalysis rows and compute simple means.
-  const n = Math.min(planned, 1200);
-  const simulated = mockSpeciesAnalysis({ sampleId: id, omics, n, seed: "DEMO" });
-  const rows = Array.isArray(simulated?.raw_data_sample) ? simulated.raw_data_sample : [];
-
-  // Minimal observed stats used by Phase3 UI.
-  const keys =
-    omics === "GENOME"
-      ? {
-          gc: "GC_Content_Percent",
-          len: "Length_bp",
-          C: "Carbon_Atoms",
-          N: "Nitrogen_Atoms",
-          P: "Phosphorus_Atoms",
-          cn: "C_N_Ratio",
-        }
-      : {
-          gc: "GC_content",
-          len: "Sequence_Length",
-          C: "C_count",
-          N: "N_count",
-          P: "P_count",
-          entropy: "Sequence_Entropy",
-        };
-
-  function mean(col) {
-    let s = 0;
-    let c = 0;
-    for (const r of rows) {
-      const v = Number(r?.[col]);
-      if (Number.isFinite(v)) {
-        s += v;
-        c += 1;
-      }
-    }
-    return c ? s / c : 0;
-  }
-
-  const observed = {
-    n_rows: rows.length,
-    gc_mean: round(mean(keys.gc), 4),
-    length_mean: round(mean(keys.len), 4),
-    C_mean: round(mean(keys.C), 4),
-    N_mean: round(mean(keys.N), 4),
-    P_mean: round(mean(keys.P), 4),
-  };
-  if (keys.cn) observed.cn_ratio_mean = round(mean(keys.cn), 4);
-  if (keys.entropy) observed.entropy_mean = round(mean(keys.entropy), 4);
-
-  return withMetaSource(
-    {
-      sim: { status: source === "demo_mode" ? "demo" : "fallback", omics },
-      planned: { n_rows: planned },
-      expected: {},
-      observed,
-      status: { rows_generated: true, observed_stats: true },
-    },
-    source
-  );
-}
-
-// -------------------------
-// Public API functions
-// -------------------------
-
-// 样本列表
 export async function getSamples(params = {}) {
   const {
     q = "",
     omics = "",
+    taxonomy = "",
+    min_gc = null,
+    max_gc = null,
+    min_cn = null,
+    max_cn = null,
+    sort = "",
     limit = 20,
     offset = 0,
   } = params || {};
 
-  if (USE_DEMO) {
-    markSource("demo_mode", DEMO_MESSAGE);
+  if (dataSourceState.mode !== "backend") {
+    markSource("demo_mode", dataSourceState.message);
+    await demoDelay();
+    const query = String(q || "").trim().toLowerCase();
+    let list = DEMO_SAMPLES.filter((s) => {
+      if (omics && s.omics_type !== omics) return false;
+      if (taxonomy && String(s.taxonomy) !== String(taxonomy)) return false;
+      if (!query) return true;
+      const hay = `${s.species_name} ${s.taxonomy} ${s.omics_type}`.toLowerCase();
+      return hay.includes(query);
+    });
+    const minGc = min_gc !== null ? Number(min_gc) : null;
+    const maxGc = max_gc !== null ? Number(max_gc) : null;
+    const minCn = min_cn !== null ? Number(min_cn) : null;
+    const maxCn = max_cn !== null ? Number(max_cn) : null;
+    list = list.filter((s) => {
+      const gc = Number(s.avg_gc ?? s.summary_stats?.observed?.gc_content?.mean);
+      const cn = Number(s.avg_cn_ratio ?? s.summary_stats?.observed?.ratios?.C_N_Ratio?.mean);
+      if (Number.isFinite(minGc) && gc < minGc) return false;
+      if (Number.isFinite(maxGc) && gc > maxGc) return false;
+      if (Number.isFinite(minCn) && cn < minCn) return false;
+      if (Number.isFinite(maxCn) && cn > maxCn) return false;
+      return true;
+    });
+    if (sort === "gc_desc") list = list.sort((a, b) => Number(b.avg_gc || 0) - Number(a.avg_gc || 0));
+    if (sort === "gc_asc") list = list.sort((a, b) => Number(a.avg_gc || 0) - Number(b.avg_gc || 0));
+    if (sort === "cn_desc") list = list.sort((a, b) => Number(b.avg_cn_ratio || 0) - Number(a.avg_cn_ratio || 0));
+    if (sort === "cn_asc") list = list.sort((a, b) => Number(a.avg_cn_ratio || 0) - Number(b.avg_cn_ratio || 0));
+    const items = list.slice(Number(offset) || 0, (Number(offset) || 0) + (Number(limit) || 20));
+    return { items, total: list.length, limit: Number(limit) || 20, offset: Number(offset) || 0 };
+  }
+
+  try {
+    const { data } = await http.get("/stoichiometry/", { params: { q, omics, taxonomy, min_gc, max_gc, min_cn, max_cn, sort, limit, offset } });
+    markSource("backend");
+    const list = normalizeSampleList(Array.isArray(data?.items) ? data.items : data);
+    const total = Number(data?.total ?? list.length);
+    return { items: list, total, limit: Number(limit) || 20, offset: Number(offset) || 0 };
+  } catch (e) {
+    markSource("demo_fallback", "Backend unavailable. Using deterministic demo fallback.", e);
     await demoDelay();
     const query = String(q || "").trim().toLowerCase();
     const list = DEMO_SAMPLES.filter((s) => {
@@ -505,34 +401,22 @@ export async function getSamples(params = {}) {
     const items = list.slice(Number(offset) || 0, (Number(offset) || 0) + (Number(limit) || 20));
     return { items, total: list.length, limit: Number(limit) || 20, offset: Number(offset) || 0 };
   }
-
-  try {
-    const { data } = await http.get("/stoichiometry/", { params: { q, omics, limit, offset } });
-    markSource("backend");
-    const list = normalizeSampleList(Array.isArray(data?.items) ? data.items : data);
-    const total = Number(data?.total ?? list.length);
-    return { items: list, total, limit: Number(limit) || 20, offset: Number(offset) || 0 };
-  } catch (e) {
-    markSource("demo_fallback", "Backend unavailable. Using deterministic demo fallback.", e);
-    const list = DEMO_SAMPLES;
-    const items = list.slice(Number(offset) || 0, (Number(offset) || 0) + (Number(limit) || 20));
-    return { items, total: list.length, limit: Number(limit) || 20, offset: Number(offset) || 0 };
-  }
 }
 
 // 单条样本元信息
 export async function getSample(id) {
-  if (USE_DEMO) {
-    markSource("demo_mode", DEMO_MESSAGE);
+  if (dataSourceState.mode !== "backend") {
+    markSource("demo_mode", dataSourceState.message);
     await demoDelay();
     return findDemoSample(id);
   }
   try {
     const { data } = await http.get(`/stoichiometry/${id}/`);
     markSource("backend");
-    return data && data.id ? data : null;
+    return data;
   } catch (e) {
     markSource("demo_fallback", "Backend unavailable. Using deterministic demo fallback.", e);
+    await demoDelay();
     return findDemoSample(id);
   }
 }
@@ -542,7 +426,7 @@ export async function getSpeciesOmics(sampleId) {
   if (!sample?.species_name) {
     return { GENOME: null, TRANSCRIPTOME: null, PROTEOME: null };
   }
-  if (USE_DEMO) {
+  if (dataSourceState.mode !== "backend") {
     const same = DEMO_SAMPLES.filter((s) => s.species_name === sample.species_name);
     return {
       GENOME: same.find((s) => s.omics_type === "GENOME")?.id || null,
@@ -550,29 +434,47 @@ export async function getSpeciesOmics(sampleId) {
       PROTEOME: same.find((s) => s.omics_type === "PROTEOME")?.id || null,
     };
   }
-
-  const response = await getSamples({ q: sample.species_name, limit: 200, offset: 0 });
-  const same = response.items || [];
-  return {
-    GENOME: same.find((s) => s.omics_type === "GENOME")?.id || null,
-    TRANSCRIPTOME: same.find((s) => s.omics_type === "TRANSCRIPTOME")?.id || null,
-    PROTEOME: same.find((s) => s.omics_type === "PROTEOME")?.id || null,
-  };
+  try {
+    const { data } = await http.get("/stoichiometry/by_species/", { params: { species_name: sample.species_name } });
+    const list = normalizeSampleList(data?.items || data);
+    return {
+      GENOME: list.find((s) => s.omics_type === "GENOME")?.id || null,
+      TRANSCRIPTOME: list.find((s) => s.omics_type === "TRANSCRIPTOME")?.id || null,
+      PROTEOME: list.find((s) => s.omics_type === "PROTEOME")?.id || null,
+    };
+  } catch (e) {
+    markSource("demo_fallback", "Backend unavailable. Using deterministic demo fallback.", e);
+    return {
+      GENOME: sample?.omics_type === "GENOME" ? sample?.id : null,
+      TRANSCRIPTOME: sample?.omics_type === "TRANSCRIPTOME" ? sample?.id : null,
+      PROTEOME: sample?.omics_type === "PROTEOME" ? sample?.id : null,
+    };
+  }
 }
 
 // 单样本分析（legacy keys + contract envelope)
 export async function getSpeciesAnalysis(id, params = { omics: "GENOME" }) {
-  if (USE_DEMO) {
-    markSource("demo_mode", DEMO_MESSAGE);
+  if (dataSourceState.mode !== "backend") {
+    markSource("demo_mode", dataSourceState.message);
     await demoDelay();
     return demoSpeciesAnalysis(id, params, "demo_mode");
   }
+
   try {
-    const { data } = await http.get(`/stoichiometry/${id}/species_analysis/`, { params });
+    const { data } = await http.get(`/stoichiometry/${id}/analysis/`, { params });
     markSource("backend");
-    // Inject meta.source if backend did not include it (or legacy backend).
-    const normalized = normalizeSpeciesAnalysisResponse(data, id, params, "backend");
-    return normalized;
+    return buildSpeciesAnalysisEnvelope({
+      sample: { id: Number(id), omics: String(params?.omics || "GENOME").toUpperCase() },
+      omics: String(params?.omics || "GENOME").toUpperCase(),
+      items: data?.items || [],
+      charts: data?.charts || {},
+      tables: data?.tables || {},
+      pagination: data?.pagination || {},
+      source: "backend",
+      status: data?.meta?.status || "ok",
+      message: data?.meta?.message || null,
+      contract: data?.meta?.contract || null,
+    });
   } catch (e) {
     markSource("demo_fallback", "Backend unavailable. Using deterministic demo fallback.", e);
     return demoSpeciesAnalysis(id, params, "demo_fallback");
@@ -581,15 +483,15 @@ export async function getSpeciesAnalysis(id, params = { omics: "GENOME" }) {
 
 // Phase3: observed_stats (lightweight)
 export async function getObservedStats(id, params = { omics: "GENOME" }) {
-  if (USE_DEMO) {
-    markSource("demo_mode", DEMO_MESSAGE);
+  if (dataSourceState.mode !== "backend") {
+    markSource("demo_mode", dataSourceState.message);
     await demoDelay();
     return demoObservedStats(id, params, "demo_mode");
   }
   try {
     const { data } = await http.get(`/stoichiometry/${id}/observed_stats/`, { params });
     markSource("backend");
-    return withMetaSource(safeObj(data), "backend", { sample_id: Number(id), omics: String(params?.omics || "GENOME").toUpperCase() });
+    return withMetaSource(data, "backend", { sample_id: Number(id), omics: String(params?.omics || "GENOME").toUpperCase() });
   } catch (e) {
     markSource("demo_fallback", "Backend unavailable. Using deterministic demo fallback.", e);
     return demoObservedStats(id, params, "demo_fallback");
@@ -601,8 +503,8 @@ export async function getSampleRows(
   id,
   params = { omics: "GENOME", limit: 2000, offset: 0, row_fields: "" }
 ) {
-  if (USE_DEMO) {
-    markSource("demo_mode", DEMO_MESSAGE);
+  if (dataSourceState.mode !== "backend") {
+    markSource("demo_mode", dataSourceState.message);
     await demoDelay();
     return demoRows(id, params, "demo_mode");
   }
@@ -618,8 +520,8 @@ export async function getSampleRows(
 
 // 多样本筛选
 export async function runMultiScreening(payload) {
-  if (USE_DEMO) {
-    markSource("demo_mode", DEMO_MESSAGE);
+  if (dataSourceState.mode !== "backend") {
+    markSource("demo_mode", dataSourceState.message);
     await demoDelay();
     const out = mockMultiScreening({ payload, seed: "DEMO" });
     return withMetaSource(out, "demo_mode", { status: "demo" });
@@ -646,12 +548,12 @@ export async function getGlobalStats() {
   const demoStats = () => ({
     species_count: DEMO_SPECIES.length,
     gene_count: DEMO_SAMPLES.filter((s) => s.omics_type === "GENOME").reduce((a, b) => a + (b.gene_count || 0), 0),
-    protein_count: null,
+    protein_count: DEMO_SAMPLES.filter((s) => s.omics_type === "PROTEOME").reduce((a, b) => a + (b.gene_count || 0), 0),
     monomer_count: DEMO_SAMPLES.reduce((a, b) => a + (b.gene_count || 0), 0),
   });
 
-  if (USE_DEMO) {
-    markSource("demo_mode", DEMO_MESSAGE);
+  if (dataSourceState.mode !== "backend") {
+    markSource("demo_mode", dataSourceState.message);
     await demoDelay();
     return withMetaSource(demoStats(), "demo_mode", { status: "demo", kind: "global_stats" });
   }

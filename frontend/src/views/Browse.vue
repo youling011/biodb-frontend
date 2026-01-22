@@ -20,10 +20,11 @@
         <el-select v-model="omicsFilter" placeholder="Omics" clearable style="width: 210px">
           <el-option label="Genome" value="GENOME" />
           <el-option label="Transcriptome" value="TRANSCRIPTOME" />
-          <el-option label="Proteome (Coming soon)" value="PROTEOME" disabled />
+          <el-option label="Proteome" value="PROTEOME" />
         </el-select>
 
         <el-button type="primary" @click="refresh" :loading="loading">Refresh</el-button>
+        <el-button type="warning" plain @click="saveCurrentCohort">Save Cohort</el-button>
 
         <el-button
           type="success"
@@ -101,17 +102,19 @@
 import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { getSamples } from "../api";
+import { getQueryNumber, getQueryString, setQueryValues } from "../utils/urlState";
+import { saveCohort } from "../utils/cohortStore";
 
 const router = useRouter();
 
 const loading = ref(false);
 const raw = ref([]);
 const total = ref(0);
-const pageSize = ref(20);
-const currentPage = ref(1);
+const pageSize = ref(getQueryNumber("ps", 20));
+const currentPage = ref(getQueryNumber("page", 1));
 
-const filterText = ref("");
-const omicsFilter = ref("");
+const filterText = ref(getQueryString("q", ""));
+const omicsFilter = ref(getQueryString("omics", ""));
 const selectedRows = ref([]);
 
 function omicsTagType(v) {
@@ -162,11 +165,27 @@ function onPageChange(page) {
   refresh();
 }
 
+function saveCurrentCohort() {
+  const name = window.prompt("Cohort name?");
+  if (!name) return;
+  const ids = raw.value.map((r) => r.id);
+  saveCohort(name, ids, { q: filterText.value, omics: omicsFilter.value });
+}
+
 onMounted(refresh);
 
 watch([filterText, omicsFilter], () => {
   currentPage.value = 1;
   refresh();
+});
+
+watch([filterText, omicsFilter, currentPage, pageSize], () => {
+  setQueryValues({
+    q: filterText.value || "",
+    omics: omicsFilter.value || "",
+    page: currentPage.value,
+    ps: pageSize.value,
+  });
 });
 </script>
 
