@@ -5,18 +5,12 @@
         <h3>{{ title }}</h3>
         <el-tag size="small" effect="plain">{{ omics }}</el-tag>
       </div>
-      <el-button type="success" @click="run" :disabled="!ready">Run Screening</el-button>
+      <div class="head-actions">
+        <el-button @click="dictionaryOpen = true">Data Dictionary</el-button>
+        <el-button @click="provenanceOpen = true">Provenance</el-button>
+        <el-button type="success" @click="run" :disabled="!ready">Run Screening</el-button>
+      </div>
     </div>
-
-    <el-alert
-      v-if="omics === 'PROTEOME'"
-      type="info"
-      show-icon
-      :closable="false"
-      title="Proteome is currently a placeholder"
-      description="Phase 2 keeps the Proteome module position in the UI, but does not simulate proteome data yet. Screening is disabled for this tab."
-      style="margin-top: 12px;"
-    />
 
     <el-row :gutter="16" style="margin-top: 12px;">
       <el-col :span="7">
@@ -50,6 +44,19 @@
               </el-select>
             </el-form-item>
 
+            <el-form-item label="Method">
+              <el-select v-model="methodChoice">
+                <el-option label="default" value="default" />
+                <el-option label="robust" value="robust" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="Features">
+              <el-select v-model="selectedFeatures" multiple collapse-tags placeholder="Select features">
+                <el-option v-for="f in featureOptions" :key="f" :label="f" :value="f" />
+              </el-select>
+            </el-form-item>
+
             <el-form-item>
               <el-switch v-model="onlySignificant" active-text="Significant only" />
             </el-form-item>
@@ -68,9 +75,7 @@
       <el-col :span="17">
         <el-empty
           v-if="!hasResult"
-          :description="omics === 'PROTEOME'
-            ? 'Proteome data is not simulated yet. Please switch to Genome/Transcriptome.'
-            : 'Configure groups and run screening.'"
+          description="Configure groups and run screening."
           style="margin-top: 80px;"
         />
 
@@ -104,10 +109,11 @@
               <div class="card-header">
                 <span>Differential List</span>
                 <div class="hdr-actions">
-                  <el-input v-model="kw" clearable placeholder="Filter gene…" style="width: 220px">
+                  <el-input v-model="kw" clearable placeholder="Filter feature…" style="width: 220px">
                     <template #prefix><el-icon><Search /></el-icon></template>
                   </el-input>
                   <el-button type="primary" icon="Download" @click="exportCsv">Export CSV</el-button>
+                  <el-button @click="copyLink">Share</el-button>
                 </div>
               </div>
             </template>
@@ -130,6 +136,13 @@
       </el-col>
     </el-row>
   </div>
+  <FeatureDictionaryDrawer v-model="dictionaryOpen" :omics="omics" />
+  <ProvenancePanel
+    v-model="provenanceOpen"
+    :mode="dataSourceState.source"
+    :api-base="apiBase"
+    :params="paramsSnapshot"
+  />
 </template>
 
 <script setup>
@@ -138,6 +151,10 @@ import { ElMessage } from "element-plus";
 import { runMultiScreening } from "../../api";
 import { exportObjectsToCsv } from "../../utils/exportCsv";
 import EChart from "../../components/EChart.vue";
+import FeatureDictionaryDrawer from "../../components/FeatureDictionaryDrawer.vue";
+import ProvenancePanel from "../../components/ProvenancePanel.vue";
+import { dataSourceState } from "../../api";
+import { getQueryList, getQueryNumber, getQueryString, setQueryList, setQueryValues } from "../../utils/urlState";
 
 const props = defineProps({
   title: { type: String, default: "Multi-omics Screening" },
@@ -155,6 +172,8 @@ const groupB = ref([]);
 
 const thresholdFc = ref(1.5);
 const thresholdP = ref(0.05);
+const methodChoice = ref("default");
+const selectedFeatures = ref([]);
 const onlySignificant = ref(false);
 const kw = ref("");
 
@@ -166,18 +185,25 @@ const impRef = ref(null);
 const volcanoRef = ref(null);
 const pcaRef = ref(null);
 
-const ready = computed(() => {
-  if (props.omics === "PROTEOME") return false;
-  return groupA.value.length > 0 && groupB.value.length > 0;
+const ready = computed(() => groupA.value.length > 0 && groupB.value.length > 0);
+
+const omicsSamples = computed(() => (props.samples || []).filter((s) => s.omics_type === props.omics));
+const prefix = computed(() => (props.omics === "GENOME" ? "g" : props.omics === "TRANSCRIPTOME" ? "t" : "p"));
+
+const featureOptions = computed(() => {
+  if (props.omics === "PROTEOME") {
+    return ["C_per_res", "H_per_res", "O_per_res", "N_per_res", "S_per_res", "pI", "Net_Charge", "GRAVY", "Aromaticity", "Aliphatic_Index", "Instability_Index", "Solvent_Accessibility"];
+  }
+  return ["GC_Content_Percent", "C_N_Ratio", "Length_bp", "Nitrogen_Atoms", "Carbon_Atoms"];
 });
 
 const groupAOptions = computed(() => {
   const b = new Set(groupB.value);
-  return (props.samples || []).filter((s) => !b.has(s.id));
+  return omicsSamples.value.filter((s) => !b.has(s.id));
 });
 const groupBOptions = computed(() => {
   const a = new Set(groupA.value);
-  return (props.samples || []).filter((s) => !a.has(s.id));
+  return omicsSamples.value.filter((s) => !a.has(s.id));
 });
 
 function isSig(r) {
@@ -193,10 +219,6 @@ const filteredDiff = computed(() => {
 });
 
 async function run() {
-  if (props.omics === "PROTEOME") {
-    ElMessage.info("Proteome is a placeholder in the current version (no simulated proteome data).");
-    return;
-  }
   if (!ready.value) {
     ElMessage.warning("Please select Group A and Group B.");
     return;
@@ -209,6 +231,8 @@ async function run() {
       omics_type: props.omics,
       threshold_fc: thresholdFc.value,
       threshold_p: thresholdP.value,
+      method: methodChoice.value,
+      features: selectedFeatures.value,
     };
 
     const data = await runMultiScreening(payload);
@@ -314,11 +338,65 @@ watch(
   },
   { immediate: true }
 );
+
+const dictionaryOpen = ref(false);
+const provenanceOpen = ref(false);
+const paramsSnapshot = computed(() => ({
+  groupA: groupA.value,
+  groupB: groupB.value,
+  kw: kw.value,
+  fc: thresholdFc.value,
+  p: thresholdP.value,
+  method: methodChoice.value,
+  features: selectedFeatures.value,
+}));
+
+const apiBase = String(import.meta.env.VITE_API_BASE_URL || "");
+
+function hydrateFromUrl() {
+  const p = prefix.value;
+  const available = new Set(omicsSamples.value.map((s) => s.id));
+  groupA.value = getQueryList(`${p}A`).map((x) => Number(x)).filter((id) => available.has(id));
+  groupB.value = getQueryList(`${p}B`).map((x) => Number(x)).filter((id) => available.has(id));
+  thresholdFc.value = getQueryNumber(`${p}F`, thresholdFc.value);
+  thresholdP.value = getQueryNumber(`${p}P`, thresholdP.value);
+  kw.value = getQueryString(`${p}Kw`, "");
+  selectedFeatures.value = getQueryList(`${p}Feat`);
+  methodChoice.value = getQueryString(`${p}Method`, "default");
+}
+
+function syncToUrl() {
+  const p = prefix.value;
+  setQueryList(`${p}A`, groupA.value);
+  setQueryList(`${p}B`, groupB.value);
+  setQueryValues({
+    [`${p}F`]: thresholdFc.value,
+    [`${p}P`]: thresholdP.value,
+    [`${p}Kw`]: kw.value,
+    [`${p}Method`]: methodChoice.value,
+  });
+  setQueryList(`${p}Feat`, selectedFeatures.value);
+}
+
+let syncTimer = null;
+watch([groupA, groupB, thresholdFc, thresholdP, kw, selectedFeatures, methodChoice], () => {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncToUrl, 200);
+});
+
+function copyLink() {
+  syncToUrl();
+  navigator.clipboard.writeText(window.location.href);
+  ElMessage.success("Link copied.");
+}
+
+watch(() => props.omics, hydrateFromUrl, { immediate: true });
 </script>
 
 <style scoped>
 .multi-panel { width: 100%; }
 .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .ttl { display: flex; align-items: center; gap: 10px; }
 .ttl h3 { margin: 0; color: #2c3e50; }
 .control { background: #f8f9fa; }

@@ -11,7 +11,7 @@
 //   - "demo_fallback": backend unreachable, using deterministic demo fallback
 
 import { computed } from "vue";
-import { dataSourceState } from "../api";
+import { dataSourceState, setDataMode } from "../api";
 
 export function useDataSourceStore() {
   const state = dataSourceState;
@@ -48,5 +48,6 @@ export function useDataSourceStore() {
     isDemoMode,
     isFallback,
     banner,
+    setDataMode,
   };
 }

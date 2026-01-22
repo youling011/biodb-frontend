@@ -45,7 +45,8 @@
 
 <script setup>
 import { ref, onMounted, watch } from "vue";
-import { getSample, getSamples } from "../api";
+import { getSample, getSpeciesOmics } from "../api";
+import { getQueryString, setQueryValues } from "../utils/urlState";
 
 import GenomeAnalysis from "../modules/analysis/GenomeAnalysis.vue";
 import TranscriptomeAnalysis from "../modules/analysis/TranscriptomeAnalysis.vue";
@@ -66,21 +67,15 @@ const omicsIds = ref({
   PROTEOME: null,
 });
 
-const omicsTab = ref("GENOME");
+const omicsTab = ref(getQueryString("omics", "GENOME"));
 
 async function resolveOmicsIds() {
-  if (!sample.value?.species_name) {
+  if (!sample.value?.id) {
     omicsIds.value = { GENOME: null, TRANSCRIPTOME: null, PROTEOME: null };
     return;
   }
   try {
-    const all = await getSamples();
-    const same = (all || []).filter((s) => s?.species_name === sample.value.species_name);
-    omicsIds.value = {
-      GENOME: same.find((s) => s?.omics_type === "GENOME")?.id || null,
-      TRANSCRIPTOME: same.find((s) => s?.omics_type === "TRANSCRIPTOME")?.id || null,
-      PROTEOME: same.find((s) => s?.omics_type === "PROTEOME")?.id || null,
-    };
+    omicsIds.value = await getSpeciesOmics(sample.value.id);
   } catch (e) {
     // On any failure, keep current id as the only resolvable sample to avoid blocking UI.
     omicsIds.value = {
@@ -117,6 +112,10 @@ watch(
   () => sample.value?.species_name,
   () => resolveOmicsIds()
 );
+
+watch(omicsTab, () => {
+  setQueryValues({ omics: omicsTab.value });
+});
 </script>
 
 <style scoped>

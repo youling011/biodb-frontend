@@ -97,7 +97,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { buildBarOption, buildHistOption } from "../shared/echartsKit";
-import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../shared/showcaseKit";
+import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";
 import { histogram, safeNum } from "./genomeUtils";
 
 const props = defineProps({

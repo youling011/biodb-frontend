@@ -113,7 +113,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
-import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../shared/showcaseKit";
+import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";
 
 // Showcase-first panel:
 // - Generates its own aesthetic data.

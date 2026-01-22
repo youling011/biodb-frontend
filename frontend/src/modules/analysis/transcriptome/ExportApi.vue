@@ -44,7 +44,7 @@
 <script setup>
 import { computed } from "vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
-import { makeTranscriptomeRows } from "../shared/showcaseKit";
+import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
 
 const props = defineProps({
   seed: { type: String, default: "TX:demo" },
