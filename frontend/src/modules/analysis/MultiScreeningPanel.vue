@@ -96,9 +96,18 @@
                 <EChart ref="volcanoRef" :option="volcanoOption" height="360px" />
               </el-card>
             </el-col>
-
             <el-col :span="10">
-              <el-card shadow="never" header="PCA / Scatter">
+              <el-card shadow="never">
+                <template #header>
+                  <div class="card-header">
+                    <span>PCA</span>
+                    <div class="hdr-actions">
+                      <el-button text @click="exportChart(pcaRef, `${omics}_pca.png`)">
+                        <el-icon><Download /></el-icon>
+                      </el-button>
+                    </div>
+                  </div>
+                </template>
                 <EChart ref="pcaRef" :option="pcaOption" height="360px" />
               </el-card>
             </el-col>
@@ -107,13 +116,11 @@
           <el-card shadow="never">
             <template #header>
               <div class="card-header">
-                <span>Differential List</span>
+                <span>Diff Features</span>
                 <div class="hdr-actions">
-                  <el-input v-model="kw" clearable placeholder="Filter feature…" style="width: 220px">
-                    <template #prefix><el-icon><Search /></el-icon></template>
-                  </el-input>
-                  <el-button type="primary" icon="Download" @click="exportCsv">Export CSV</el-button>
-                  <el-button @click="copyLink">Share</el-button>
+                  <el-input v-model="kw" placeholder="Search gene" clearable style="width: 220px" />
+                  <el-button @click="exportCsv">Export CSV</el-button>
+                  <el-button type="primary" @click="copyLink">Share Link</el-button>
                 </div>
               </div>
             </template>
@@ -187,7 +194,7 @@ const pcaRef = ref(null);
 
 const ready = computed(() => groupA.value.length > 0 && groupB.value.length > 0);
 
-const omicsSamples = computed(() => (props.samples || []).filter((s) => s.omics_type === props.omics));
+const omicsSamplesFiltered = computed(() => (props.samples || []).filter((s) => s.omics_type === props.omics));
 const prefix = computed(() => (props.omics === "GENOME" ? "g" : props.omics === "TRANSCRIPTOME" ? "t" : "p"));
 
 const featureOptions = computed(() => {
@@ -197,15 +204,13 @@ const featureOptions = computed(() => {
   return ["GC_Content_Percent", "C_N_Ratio", "Length_bp", "Nitrogen_Atoms", "Carbon_Atoms"];
 });
 
-const omicsSamples = computed(() => (props.samples || []).filter((s) => s.omics_type === props.omics));
-
 const groupAOptions = computed(() => {
   const b = new Set(groupB.value);
-  return omicsSamples.value.filter((s) => !b.has(s.id));
+  return omicsSamplesFiltered.value.filter((s) => !b.has(s.id));
 });
 const groupBOptions = computed(() => {
   const a = new Set(groupA.value);
-  return omicsSamples.value.filter((s) => !a.has(s.id));
+  return omicsSamplesFiltered.value.filter((s) => !a.has(s.id));
 });
 
 function isSig(r) {
@@ -357,7 +362,7 @@ const apiBase = String(import.meta.env.VITE_API_BASE_URL || "");
 
 function hydrateFromUrl() {
   const p = prefix.value;
-  const available = new Set(omicsSamples.value.map((s) => s.id));
+  const available = new Set(omicsSamplesFiltered.value.map((s) => s.id));
   groupA.value = getQueryList(`${p}A`).map((x) => Number(x)).filter((id) => available.has(id));
   groupB.value = getQueryList(`${p}B`).map((x) => Number(x)).filter((id) => available.has(id));
   thresholdFc.value = getQueryNumber(`${p}F`, thresholdFc.value);
