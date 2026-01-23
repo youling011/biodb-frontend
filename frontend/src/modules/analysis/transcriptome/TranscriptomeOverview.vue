@@ -1,5 +1,16 @@
 <template>
   <div class="tx-overview">
+    <el-card class="data-layer" shadow="never">
+      <div class="card-hdr">
+        <span>Data Layer Declaration</span>
+      </div>
+      <div class="layer-tags">
+        <el-tag type="info" effect="plain">raw counts: yes</el-tag>
+        <el-tag type="success" effect="plain">normalized: yes</el-tag>
+        <el-tag type="warning" effect="plain">log1p: yes</el-tag>
+      </div>
+    </el-card>
+
     <el-row :gutter="12">
       <el-col :xs="24" :sm="12" :lg="6">
         <el-card>
@@ -173,7 +184,7 @@
 import { computed, ref } from "vue";
 import EChart from "../../../components/EChart.vue";
 
-import { makeTranscriptomeRows } from "../shared/showcaseKit";
+import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
 import { buildBarOption, buildHistOption, buildBoxplotOption, buildHeatmapOption } from "../shared/echartsKit";
 import { boxplotStats, cleanNumbers, mean, pearson, quantile, toNumber } from "../shared/stats";
 
@@ -428,6 +439,16 @@ const corrHeatmap = computed(() => {
 <style scoped>
 .tx-overview {
   width: 100%;
+}
+.data-layer {
+  background: #f7f9fc;
+  margin-bottom: 12px;
+}
+.layer-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
 }
 .kpi {
   display: flex;

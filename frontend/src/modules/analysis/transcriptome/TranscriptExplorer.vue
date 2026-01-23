@@ -125,7 +125,7 @@ import { computed, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { safeNum, extractDinucMatrix, extractTopTrinuc, round } from "./transcriptomeUtils";
-import { makeTranscriptomeRows } from "../shared/showcaseKit";
+import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
 
 const props = defineProps({
   seed: { type: String, default: "TX:demo" },
@@ -133,8 +133,32 @@ const props = defineProps({
 });
 
 // Self-generated dataset for this tab.
+const hvgSet = computed(() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem("biostoich_hvg_genes") || "[]");
+    return new Set(Array.isArray(raw) ? raw : []);
+  } catch {
+    return new Set();
+  }
+});
+
+const deMap = computed(() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem("biostoich_de_table") || "[]");
+    if (!Array.isArray(raw)) return new Map();
+    return new Map(raw.map((r) => [r.gene, r]));
+  } catch {
+    return new Map();
+  }
+});
+
 const rows = computed(() =>
   makeTranscriptomeRows({ seed: `${props.seed}:${props.seedBump}:explorer`, n: 3200 })
+    .map((r) => ({
+      ...r,
+      is_hvg: hvgSet.value.has(r.Gene_Name),
+      log2fc: deMap.value.get(r.Gene_Name)?.log2fc ?? null,
+    }))
 );
 
 const kw = ref("");
@@ -216,6 +240,8 @@ const pageRows = computed(() => {
 
 const tableColumns = computed(() => [
   { key: "Gene_Name", label: "Gene/Tx", width: 180, fixed: "left", sortable: false },
+  { key: "is_hvg", label: "HVG", width: 80, sortable: true },
+  { key: "log2fc", label: "log2FC", width: 90, sortable: true },
   { key: "Sequence_Length", label: "Length", width: 110, sortable: true },
   { key: "GC_content", label: "GC%", width: 110, sortable: true },
   { key: "Sequence_Entropy", label: "Entropy", width: 120, sortable: true },

@@ -7,7 +7,7 @@
  * - Deterministic power-iteration with deflation for top-k components.
  */
 
-import { zscoreMatrix, toNumber } from "./stats";
+import { clrTransform, imputeMatrix, log1pMatrix, toNumber, zscoreMatrix } from "./stats";
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -179,4 +179,74 @@ export function pca(matrix, opts = {}) {
   const explainedVarianceRatio = eigenvalues.map((ev) => ev / totalVar);
 
   return { scores, components, eigenvalues, explainedVarianceRatio };
+}
+
+function centerMatrix(matrix) {
+  if (!Array.isArray(matrix) || matrix.length === 0) return { X: [], means: [] };
+  const m = matrix.length;
+  const n = Array.isArray(matrix[0]) ? matrix[0].length : 0;
+  const means = new Array(n).fill(0);
+  for (let i = 0; i < m; i++) {
+    for (let j = 0; j < n; j++) means[j] += toNumber(matrix[i]?.[j], 0);
+  }
+  for (let j = 0; j < n; j++) means[j] /= m || 1;
+  const X = matrix.map((row) => row.map((v, j) => toNumber(v, 0) - means[j]));
+  return { X, means };
+}
+
+function clrMatrix(matrix, { pseudocount = 1 } = {}) {
+  if (!Array.isArray(matrix)) return [];
+  return matrix.map((row) => clrTransform(row, pseudocount));
+}
+
+/**
+ * runPCA with preprocessing options.
+ * @param {number[][]} matrix
+ * @param {object} opts
+ * @returns {{scores:number[][], explainedVarianceRatio:number[], preprocess_snapshot: object}}
+ */
+export function runPCA(matrix, opts = {}) {
+  const {
+    k = 2,
+    standardize = true,
+    log1p = false,
+    clr = false,
+    center = true,
+    impute = "drop",
+    pseudocount = 1,
+    seed = 0,
+  } = opts;
+
+  let X = Array.isArray(matrix) ? matrix.map((row) => (Array.isArray(row) ? row.slice() : [])) : [];
+  const imputed = imputeMatrix(X, impute, { pseudocount });
+  X = imputed.X;
+
+  if (log1p) X = log1pMatrix(X);
+  if (clr) X = clrMatrix(X, { pseudocount });
+
+  let centerSnapshot = null;
+  if (center && !standardize) {
+    const centered = centerMatrix(X);
+    X = centered.X;
+    centerSnapshot = centered.means;
+  }
+
+  const res = pca(X, { k, standardize, seed });
+
+  return {
+    scores: res.scores,
+    components: res.components,
+    eigenvalues: res.eigenvalues,
+    explainedVarianceRatio: res.explainedVarianceRatio,
+    preprocess_snapshot: {
+      standardize,
+      log1p,
+      clr,
+      center,
+      impute,
+      pseudocount,
+      dropped_rows: imputed.dropped,
+      centered_means: centerSnapshot,
+    },
+  };
 }

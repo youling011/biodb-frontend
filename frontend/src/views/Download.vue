@@ -4,7 +4,7 @@
     <el-alert
       title="License Information"
       type="info"
-      description="All data is available under CC-BY 4.0 License. Please cite our paper when using this data."
+      description="All data is available under CC-BY 4.0 License. Exports include a provenance_snapshot.json with parameters (HVG/DE/CLR/etc.) for reproducibility."
       show-icon
       style="margin-bottom: 20px;"
     />
@@ -27,9 +27,9 @@
 import { ref } from 'vue';
 
 const files = ref([
-  { name: 'All_Gene_Expression_Matrix.csv', desc: 'Normalized gene expression matrix for all 31,000 species.', size: '4.2 GB', date: '2026-01-01' },
-  { name: 'Microbial_Phenotypes_Metadata.xlsx', desc: 'Metadata including habitat, temperature, and phylum info.', size: '12 MB', date: '2025-12-10' },
-  { name: 'Differential_Analysis_Results.tar.gz', desc: 'Full statistical analysis output (DESeq2 results).', size: '560 MB', date: '2025-11-20' },
+  { name: 'BioStoichDB_Species_Metadata.csv', desc: 'Species taxonomy, omics layer, and sample identifiers.', size: '18 MB', date: '2026-02-12' },
+  { name: 'Genome_Stoichiometry_Summary.csv', desc: 'Genome-level elemental summary statistics (GC, C:N, length).', size: '220 MB', date: '2026-02-12' },
+  { name: 'Transcriptome_Stoichiometry_Summary.csv', desc: 'Transcriptome-level stoichiometry summaries and distributions.', size: '180 MB', date: '2026-02-12' },
 ]);
 </script>
 

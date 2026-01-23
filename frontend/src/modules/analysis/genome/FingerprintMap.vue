@@ -32,6 +32,18 @@
       <template v-if="view === 'scatter'">
         <el-slider v-model="sampleN" :min="200" :max="2000" :step="100" show-input style="width: 370px" />
         <span class="hint">Sampling genes: {{ sampleN }}</span>
+        <el-select v-model="transform" style="width: 140px">
+          <el-option label="None" value="none" />
+          <el-option label="log1p" value="log1p" />
+          <el-option label="CLR" value="clr" />
+        </el-select>
+        <el-select v-model="impute" style="width: 140px">
+          <el-option label="drop" value="drop" />
+          <el-option label="zero" value="zero" />
+          <el-option label="pseudocount" value="pseudocount" />
+          <el-option label="median" value="median" />
+        </el-select>
+        <el-switch v-model="standardize" active-text="Standardize" />
       </template>
     </div>
 
@@ -66,8 +78,8 @@ import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { buildHeatmapOption, buildScatterOption } from "../shared/echartsKit";
 import { groupBy, isFiniteNumber, mean } from "../shared/stats";
-import { pca } from "../shared/pca";
-import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../shared/showcaseKit";
+import { runPCA } from "../shared/pca";
+import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";
 import { safeNum } from "./genomeUtils";
 
 const props = defineProps({
@@ -107,6 +119,9 @@ const mode = ref("codon");
 const view = ref("heatmap");
 const sampleN = ref(800);
 const topK = ref(24);
+const transform = ref("none");
+const impute = ref("drop");
+const standardize = ref(true);
 
 const mapRef = ref(null);
 
@@ -247,7 +262,14 @@ const scatterPca = computed(() => {
   const rs = downsample(localRows.value || [], sampleN.value);
 
   const X = rs.map((r) => chosen.map((j) => safeNum(r?.[keys[j]], 0)));
-  const { scores, explainedVarianceRatio } = pca(X, { k: 2, seed: 42 });
+  const { scores, explainedVarianceRatio } = runPCA(X, {
+    k: 2,
+    seed: 42,
+    standardize: standardize.value,
+    log1p: transform.value === "log1p",
+    clr: transform.value === "clr",
+    impute: impute.value,
+  });
 
   const pts = rs.map((r, i) => {
     const x = scores?.[i]?.[0] ?? 0;

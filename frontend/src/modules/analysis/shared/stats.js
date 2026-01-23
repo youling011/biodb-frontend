@@ -336,6 +336,109 @@ export function zscoreMatrix(matrix) {
   return { X, means, stds };
 }
 
+export function log1pMatrix(matrix) {
+  if (!Array.isArray(matrix)) return [];
+  return matrix.map((row) => (Array.isArray(row) ? row.map((v) => Math.log1p(Math.max(0, toNumber(v, 0)))) : []));
+}
+
+export function imputeMatrix(matrix, strategy = "drop", { pseudocount = 1 } = {}) {
+  if (!Array.isArray(matrix)) return { X: [], dropped: 0 };
+  if (strategy === "drop") {
+    const X = matrix.filter((row) => Array.isArray(row) && row.every((v) => Number.isFinite(toNumber(v, null))));
+    return { X, dropped: matrix.length - X.length };
+  }
+
+  if (strategy === "zero") {
+    return { X: matrix.map((row) => row.map((v) => toNumber(v, 0))), dropped: 0 };
+  }
+
+  if (strategy === "pseudocount") {
+    return { X: matrix.map((row) => row.map((v) => {
+      const n = toNumber(v, null);
+      return Number.isFinite(n) ? n : pseudocount;
+    })), dropped: 0 };
+  }
+
+  if (strategy === "median") {
+    const cols = Array.isArray(matrix[0]) ? matrix[0].length : 0;
+    const medians = new Array(cols).fill(0).map((_, j) => median(cleanNumbers(matrix.map((row) => row?.[j])) ) ?? 0);
+    return {
+      X: matrix.map((row) => row.map((v, j) => {
+        const n = toNumber(v, null);
+        return Number.isFinite(n) ? n : medians[j];
+      })),
+      dropped: 0,
+    };
+  }
+
+  return { X: matrix, dropped: 0 };
+}
+
+export function clrTransform(vector, pseudocount = 1) {
+  const v = (Array.isArray(vector) ? vector : []).map((x) => Math.max(0, toNumber(x, 0)) + pseudocount);
+  if (v.length === 0) return [];
+  const logv = v.map((x) => Math.log(x));
+  const gm = mean(logv) ?? 0;
+  return logv.map((x) => x - gm);
+}
+
+export function alrTransform(vector, refIndex = 0, pseudocount = 1) {
+  const v = (Array.isArray(vector) ? vector : []).map((x) => Math.max(0, toNumber(x, 0)) + pseudocount);
+  if (v.length === 0) return [];
+  const denom = v[refIndex] ?? 1;
+  return v.map((x) => Math.log(x / denom));
+}
+
+export function aitchisonDistance(x, y, { pseudocount = 1 } = {}) {
+  const cx = clrTransform(x, pseudocount);
+  const cy = clrTransform(y, pseudocount);
+  const n = Math.min(cx.length, cy.length);
+  if (n === 0) return null;
+  let s = 0;
+  for (let i = 0; i < n; i++) {
+    const d = (cx[i] ?? 0) - (cy[i] ?? 0);
+    s += d * d;
+  }
+  return Math.sqrt(s);
+}
+
+function rankArray(arr) {
+  const indexed = arr.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
+  const ranks = new Array(arr.length);
+  for (let i = 0; i < indexed.length; i++) {
+    ranks[indexed[i].i] = i + 1;
+  }
+  return ranks;
+}
+
+export function spearmanCorr(xArr, yArr) {
+  const x = cleanNumbers(xArr);
+  const y = cleanNumbers(yArr);
+  const n = Math.min(x.length, y.length);
+  if (n < 2) return null;
+  const rx = rankArray(x.slice(0, n));
+  const ry = rankArray(y.slice(0, n));
+  return pearson(rx, ry);
+}
+
+function winsorize(arr, p = 0.05) {
+  if (!arr.length) return [];
+  const sorted = [...arr].sort((a, b) => a - b);
+  const lo = quantile(sorted, p);
+  const hi = quantile(sorted, 1 - p);
+  return arr.map((v) => Math.min(hi, Math.max(lo, v)));
+}
+
+export function robustCorr(xArr, yArr, { winsor = 0.05 } = {}) {
+  const x = cleanNumbers(xArr);
+  const y = cleanNumbers(yArr);
+  const n = Math.min(x.length, y.length);
+  if (n < 2) return null;
+  const wx = winsorize(x.slice(0, n), winsor);
+  const wy = winsorize(y.slice(0, n), winsor);
+  return pearson(wx, wy);
+}
+
 /**
  * Build an ECharts boxplot series dataset from raw values.
  * Returns { categories, boxData, outliers }
