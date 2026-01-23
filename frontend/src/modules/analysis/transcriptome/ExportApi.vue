@@ -15,6 +15,9 @@
       <el-descriptions-item label="Mode">
         Showcase mode (front-end synthetic rows). Each refresh regenerates deterministically using (seed, seedBump).
       </el-descriptions-item>
+      <el-descriptions-item label="Provenance">
+        Exports include provenance_snapshot.json capturing HVG/DE/compositional parameters.
+      </el-descriptions-item>
     </el-descriptions>
 
     <el-divider content-position="left">Field Groups</el-divider>

@@ -6,7 +6,12 @@
           <template #header>
             <div class="hdr">
               <div class="hdr-left">
-                <span>Function Category Boxplot</span>
+                <span>Annotation Boxplot</span>
+                <el-select v-model="groupKey" size="small" style="width: 160px">
+                  <el-option label="Function Category" value="Function_Category" />
+                  <el-option label="GO term" value="GO_terms" />
+                  <el-option label="KEGG" value="KEGG" />
+                </el-select>
                 <el-select v-model="metricKey" size="small" style="width: 220px">
                   <el-option v-for="m in metricOptions" :key="m.key" :label="m.label" :value="m.key" />
                 </el-select>
@@ -22,7 +27,7 @@
         <el-card>
           <template #header>
             <div class="hdr">
-              <span>Category Means</span>
+              <span>Annotation Means</span>
               <el-button size="small" @click="exportChart(meanRef, 'category_means.png')">Export PNG</el-button>
             </div>
           </template>
@@ -36,7 +41,7 @@
         <el-card>
           <template #header>
             <div class="hdr">
-              <span>Category Summary Table</span>
+              <span>Annotation Summary Table</span>
               <el-button size="small" @click="exportSummaryCsv">Export CSV</el-button>
             </div>
           </template>
@@ -132,7 +137,24 @@ const metricOptions = [
 const metricKey = ref("N_density");
 const metric = computed(() => metricOptions.find((m) => m.key === metricKey.value) || metricOptions[0]);
 
-const grouped = computed(() => groupBy(localRows.value || [], (r) => String(r.Function_Category || "Unknown")));
+const groupKey = ref("Function_Category");
+
+const grouped = computed(() => {
+  const rows = localRows.value || [];
+  if (groupKey.value === "GO_terms") {
+    const out = new Map();
+    rows.forEach((r) => {
+      const terms = Array.isArray(r.GO_terms) ? r.GO_terms : ["Unknown"];
+      terms.forEach((t) => {
+        const key = String(t || "Unknown");
+        if (!out.has(key)) out.set(key, []);
+        out.get(key).push(r);
+      });
+    });
+    return out;
+  }
+  return groupBy(rows, (r) => String(r[groupKey.value] || "Unknown"));
+});
 const cats = computed(() => {
   const base = Array.from(grouped.value.keys()).map(String).sort((a, b) => a.localeCompare(b));
   const idx = base.indexOf("none");

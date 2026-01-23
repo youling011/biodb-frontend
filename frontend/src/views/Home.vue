@@ -70,18 +70,25 @@
 
     <div class="intro-section">
       <el-row :gutter="40">
-        <el-col :span="12">
+        <el-col :span="8">
           <el-card shadow="hover" class="feature-card">
             <template #header><h3><el-icon><DataLine /></el-icon> Single Species Analysis</h3></template>
             <p>Deep dive into the stoichiometric features of a single species.</p>
             <el-button type="primary" plain @click="goToBrowse">View Species List</el-button>
           </el-card>
         </el-col>
-        <el-col :span="12">
+        <el-col :span="8">
           <el-card shadow="hover" class="feature-card">
             <template #header><h3><el-icon><Cpu /></el-icon> Multi-Species Comparison</h3></template>
             <p>Select multiple datasets to screen for differential monomers.</p>
             <el-button type="success" plain @click="$router.push('/multi-analysis')">Start Comparison</el-button>
+          </el-card>
+        </el-col>
+        <el-col :span="8">
+          <el-card shadow="hover" class="feature-card">
+            <template #header><h3><el-icon><Share /></el-icon> Integration</h3></template>
+            <p>Cross-omics summary alignment and joint PCA for multi-omics integration.</p>
+            <el-button type="warning" plain @click="$router.push('/integration')">Open Integration</el-button>
           </el-card>
         </el-col>
       </el-row>

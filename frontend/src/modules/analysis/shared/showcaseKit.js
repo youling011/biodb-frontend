@@ -180,6 +180,24 @@ function weightedChoice(rng, items) {
   return items[items.length - 1]?.v;
 }
 
+const GENOME_CONTIGS = ["chr1", "chr2", "chr3"];
+const PRODUCT_BANK = [
+  "DNA-directed RNA polymerase subunit",
+  "ABC transporter ATP-binding protein",
+  "Ribosomal protein",
+  "Two-component response regulator",
+  "Oxidoreductase",
+  "Hypothetical protein",
+  "Membrane protein",
+  "Chaperone",
+  "Transcriptional regulator",
+];
+const GO_BANK = ["GO:0006355", "GO:0005524", "GO:0003677", "GO:0005886", "GO:0008152"];
+const KEGG_BANK = ["K00844", "K01803", "K03406", "K09020"];
+const COG_BANK = ["COG0457", "COG1132", "COG0197", "COG0480"];
+const PFAM_BANK = ["PF00005", "PF01000", "PF00350", "PF08279"];
+const INTERPRO_BANK = ["IPR000001", "IPR004358", "IPR012345"];
+
 function makeAtomBundle({ lengthBp, gc, rng }) {
   // Aesthetic, not chemically exact: strong correlation with length, mild with GC.
   const gcAdj = (Number(gc) - 50) / 50; // ~[-1, 1]
@@ -273,6 +291,7 @@ export function makeGenomeRows(cfg = {}) {
     return { v: c, w };
   });
 
+  let cursor = 1000;
   for (let i = 0; i < n; i++) {
     const cat = weightedChoice(rng, catWeights);
     const strand = rng.next() < 0.5 ? "+" : "-";
@@ -295,10 +314,29 @@ export function makeGenomeRows(cfg = {}) {
 
     const fingerprint = makeFingerprint({ gc, rng });
 
+    const contig = rng.choice(GENOME_CONTIGS) || "chr1";
+    const start = cursor + rng.int(10, 120);
+    const end = start + len - 1;
+    cursor = end + rng.int(50, 400);
+    const product = rng.choice(PRODUCT_BANK) || "Hypothetical protein";
+    const goCount = rng.int(1, 3);
+    const goTerms = new Array(goCount).fill(0).map(() => rng.choice(GO_BANK));
+
     rows.push({
       Gene_Name: `gene_${String(i + 1).padStart(4, "0")}`,
       Function_Category: cat,
       Strand: strand,
+      Contig: contig,
+      Start: start,
+      End: end,
+      Product: product,
+      Description: `${product} involved in ${cat.toLowerCase()}`,
+      GO_terms: goTerms.filter(Boolean),
+      KEGG: rng.choice(KEGG_BANK),
+      COG: rng.choice(COG_BANK),
+      Pfam: rng.choice(PFAM_BANK),
+      InterPro: rng.choice(INTERPRO_BANK),
+      Operon_ID: `op_${Math.floor(i / 5) + 1}`,
       Length_bp: len,
       GC_Content_Percent: round(gc, 3),
 
@@ -516,3 +554,102 @@ export const ShowcaseTxConsts = {
   TX_CODON_BASES,
   TX_CODONS_ORDER,
 };
+
+// ---------------------------------------------------------------------------
+// Transcriptome QC / HVG / DE synthetic payloads
+// ---------------------------------------------------------------------------
+
+export function makeTranscriptomeQC(cfg = {}) {
+  const { seed = "TX:QC", n = 80 } = cfg;
+  const rng = makeRng(seed);
+  const metrics = [];
+  for (let i = 0; i < n; i++) {
+    const total = Math.round(randLogNormal(rng, 12.2, 0.4));
+    const genes = Math.round(clamp(randNormal(rng, 3200, 550), 800, 8000));
+    const mito = clamp(randNormal(rng, 0.07, 0.03), 0.005, 0.3);
+    metrics.push({
+      sample: `cell_${String(i + 1).padStart(3, "0")}`,
+      total_counts: total,
+      detected_genes: genes,
+      mito_ratio: round(mito, 4),
+      batch: `batch_${(i % 3) + 1}`,
+    });
+  }
+
+  const normalization = {
+    size_factor: "median-ratio",
+    log1p: true,
+    regress_covariates: ["batch"],
+  };
+
+  return {
+    qc_metrics: metrics,
+    normalization,
+    data_layer: { raw: true, normalized: true, log1p: true },
+  };
+}
+
+export function makeTranscriptomeHVG(cfg = {}) {
+  const { seed = "TX:HVG", n = 2000, nTop = 1000 } = cfg;
+  const rng = makeRng(seed);
+  const points = [];
+  const fit = [];
+  for (let i = 0; i < n; i++) {
+    const mean = clamp(randLogNormal(rng, 1.2, 0.8), 0.01, 12);
+    const variance = clamp(mean * randNormal(rng, 1.3, 0.5), 0.01, 20);
+    points.push({
+      gene: `gene_${i + 1}`,
+      mean: round(mean, 4),
+      variance: round(variance, 4),
+      score: round(Math.log1p(variance / (mean + 0.2)), 4),
+    });
+  }
+  const sorted = [...points].sort((a, b) => b.score - a.score);
+  const hvgSet = new Set(sorted.slice(0, nTop).map((p) => p.gene));
+  points.forEach((p) => {
+    p.is_hvg = hvgSet.has(p.gene);
+  });
+  for (let i = 0; i < 30; i++) {
+    const x = i / 5;
+    fit.push({ x, y: round(0.8 * x + 0.4, 4) });
+  }
+  return {
+    points,
+    fit,
+    hvg_table: sorted.slice(0, nTop),
+  };
+}
+
+export function makeTranscriptomeDE(cfg = {}) {
+  const { seed = "TX:DE", n = 1200 } = cfg;
+  const rng = makeRng(seed);
+  const rows = [];
+  for (let i = 0; i < n; i++) {
+    const log2fc = clamp(randNormal(rng, 0, 1.2), -4, 4);
+    const baseMean = clamp(randLogNormal(rng, 2.2, 0.7), 0.01, 50);
+    const pval = clamp(Math.pow(rng.next(), 3), 1e-6, 1);
+    const padj = clamp(pval * (1 + rng.next()), 1e-6, 1);
+    rows.push({
+      gene: `gene_${i + 1}`,
+      log2fc: round(log2fc, 4),
+      pval: round(pval, 6),
+      padj: round(padj, 6),
+      baseMean: round(baseMean, 4),
+    });
+  }
+  return { de_table: rows };
+}
+
+export function makeOmicsSummaryVector(cfg = {}) {
+  const { seed = "summary", omics = "GENOME" } = cfg;
+  const rng = makeRng(seed);
+  const elements = ["C", "H", "O", "N", "P", "S"];
+  const vec = {};
+  elements.forEach((el) => {
+    vec[el] = round(clamp(randNormal(rng, omics === "PROTEOME" ? 8 : 6, 1.5), 1, 12), 4);
+  });
+  vec["C:N"] = round(vec.C / Math.max(0.1, vec.N), 4);
+  vec["C:P"] = round(vec.C / Math.max(0.1, vec.P), 4);
+  vec["N:P"] = round(vec.N / Math.max(0.1, vec.P), 4);
+  return vec;
+}

@@ -48,6 +48,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from "vue";
+import { useRoute } from "vue-router";
 import { getSamples } from "../api";
 import MultiScreeningPanel from "../modules/analysis/MultiScreeningPanel.vue";
 import { getQueryString, setQueryValues } from "../utils/urlState";
@@ -56,6 +57,7 @@ import { listCohorts, getCohort } from "../utils/cohortStore";
 const loading = ref(false);
 const samples = ref([]);
 const omicsTab = ref(getQueryString("omics", "GENOME"));
+const route = useRoute();
 
 // From Browse “Compare Selected” (if exists)
 const prefillGroupA = ref([]);
@@ -79,6 +81,11 @@ async function loadSamples() {
       localStorage.removeItem("biostoich_selected_samples");
     }
   } catch {}
+
+  const selectedQuery = String(route.query?.selected || "");
+  if (selectedQuery) {
+    prefillGroupA.value = selectedQuery.split(",").map((x) => Number(x)).filter((x) => Number.isFinite(x));
+  }
 }
 
 onMounted(loadSamples);

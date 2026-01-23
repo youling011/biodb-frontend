@@ -4,7 +4,7 @@
     <el-alert
       title="License Information"
       type="info"
-      description="All data is available under CC-BY 4.0 License. Please cite our BioStoichDB publication when using this data."
+      description="All data is available under CC-BY 4.0 License. Exports include a provenance_snapshot.json with parameters (HVG/DE/CLR/etc.) for reproducibility."
       show-icon
       style="margin-bottom: 20px;"
     />

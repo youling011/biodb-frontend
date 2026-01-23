@@ -3,6 +3,10 @@ import {
   hashStringToUint32,
   makeGenomeRows,
   makeTranscriptomeRows,
+  makeTranscriptomeQC,
+  makeTranscriptomeHVG,
+  makeTranscriptomeDE,
+  makeOmicsSummaryVector,
   round,
   ShowcaseTxConsts,
 } from "../modules/analysis/shared/showcaseKit";
@@ -12,6 +16,10 @@ export {
   hashStringToUint32,
   makeGenomeRows,
   makeTranscriptomeRows,
+  makeTranscriptomeQC,
+  makeTranscriptomeHVG,
+  makeTranscriptomeDE,
+  makeOmicsSummaryVector,
   round,
   ShowcaseTxConsts,
 };

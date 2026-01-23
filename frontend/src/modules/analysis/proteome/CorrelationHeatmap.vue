@@ -4,8 +4,21 @@
       <el-select v-model="method" style="width: 160px">
         <el-option label="Pearson" value="pearson" />
         <el-option label="Spearman" value="spearman" />
+        <el-option label="Robust" value="robust" />
+      </el-select>
+      <el-select v-model="transform" style="width: 140px">
+        <el-option label="None" value="none" />
+        <el-option label="log1p" value="log1p" />
+        <el-option label="CLR" value="clr" />
+      </el-select>
+      <el-select v-model="impute" style="width: 140px">
+        <el-option label="drop" value="drop" />
+        <el-option label="zero" value="zero" />
+        <el-option label="pseudocount" value="pseudocount" />
+        <el-option label="median" value="median" />
       </el-select>
       <el-switch v-model="absMode" active-text="Absolute" />
+      <el-tag size="small" type="info" effect="plain">method: {{ method }}</el-tag>
       <el-popover placement="bottom" :width="380" trigger="click">
         <template #reference>
           <el-button>Features</el-button>
@@ -26,9 +39,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
-import { pearson, spearman } from "./proteomeUtils";
+import { clrTransform, median, pearson, robustCorr, spearmanCorr } from "../shared/stats";
+import { getQueryString, setQueryValues } from "../../../utils/urlState";
 
 const props = defineProps({
   rows: { type: Array, default: () => [] },
@@ -53,17 +67,43 @@ const featureKeys = [
 ];
 
 const selectedKeys = ref([...featureKeys]);
-const method = ref("pearson");
+const method = ref(getQueryString("prot_corr", "pearson"));
+const transform = ref(getQueryString("prot_tf", "none"));
+const impute = ref(getQueryString("prot_imp", "drop"));
 const absMode = ref(false);
+
+watch([method, transform, impute], () => {
+  setQueryValues({ prot_corr: method.value, prot_tf: transform.value, prot_imp: impute.value });
+});
+
+function prepareSeries(values) {
+  const arr = values.map((v) => Number(v));
+  if (impute.value === "drop") return arr.filter((v) => Number.isFinite(v));
+  if (impute.value === "zero") return arr.map((v) => (Number.isFinite(v) ? v : 0));
+  if (impute.value === "pseudocount") return arr.map((v) => (Number.isFinite(v) ? v : 1));
+  if (impute.value === "median") {
+    const med = median(arr.filter((v) => Number.isFinite(v))) || 0;
+    return arr.map((v) => (Number.isFinite(v) ? v : med));
+  }
+  return arr;
+}
 
 const heatmapOption = computed(() => {
   const keys = selectedKeys.value.length ? selectedKeys.value : featureKeys;
   const data = [];
-  const calc = method.value === "spearman" ? spearman : pearson;
+  const calc = method.value === "spearman" ? spearmanCorr : method.value === "robust" ? robustCorr : pearson;
   keys.forEach((a, i) => {
     keys.forEach((b, j) => {
-      const xs = props.rows.map((r) => r[a]);
-      const ys = props.rows.map((r) => r[b]);
+      let xs = prepareSeries(props.rows.map((r) => r[a]));
+      let ys = prepareSeries(props.rows.map((r) => r[b]));
+      if (transform.value === "log1p") {
+        xs = xs.map((v) => Math.log1p(Math.max(0, v)));
+        ys = ys.map((v) => Math.log1p(Math.max(0, v)));
+      }
+      if (transform.value === "clr") {
+        xs = clrTransform(xs, 1);
+        ys = clrTransform(ys, 1);
+      }
       let v = calc(xs, ys);
       if (absMode.value) v = Math.abs(v);
       data.push([j, i, Number(v.toFixed(3))]);

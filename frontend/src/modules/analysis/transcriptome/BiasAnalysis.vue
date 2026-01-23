@@ -1,5 +1,23 @@
 <template>
   <div>
+    <el-card shadow="never" class="settings">
+      <div class="settings-row">
+        <span class="label">Data transform</span>
+        <el-select v-model="transform" style="width: 140px">
+          <el-option label="None" value="none" />
+          <el-option label="CLR" value="clr" />
+          <el-option label="log1p" value="log1p" />
+        </el-select>
+        <span class="label">Missing</span>
+        <el-select v-model="impute" style="width: 140px">
+          <el-option label="drop" value="drop" />
+          <el-option label="zero" value="zero" />
+          <el-option label="pseudocount" value="pseudocount" />
+          <el-option label="median" value="median" />
+        </el-select>
+        <el-tag size="small" type="info" effect="plain">method: {{ transform.toUpperCase() }}</el-tag>
+      </div>
+    </el-card>
     <el-row :gutter="16">
       <el-col :span="12">
         <el-card>
@@ -33,13 +51,14 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
 
 import { buildHeatmapOption, buildScatterOption, buildHistOption } from "../shared/echartsKit";
-import { mean } from "../shared/stats";
+import { clrTransform, mean } from "../shared/stats";
 import { makeTranscriptomeRows, ShowcaseTxConsts } from "../../../api/showcaseAdapter";
 import { safeNum, round } from "./transcriptomeUtils";
+import { getQueryString, setQueryValues } from "../../../utils/urlState";
 
 const props = defineProps({
   seed: { type: String, default: "TX:demo" },
@@ -50,6 +69,13 @@ const props = defineProps({
 const rows = computed(() =>
   makeTranscriptomeRows({ seed: `${props.seed}:${props.seedBump}:bias`, n: 2600 })
 );
+
+const transform = ref(getQueryString("tx_bias_tf", "none"));
+const impute = ref(getQueryString("tx_bias_imp", "drop"));
+
+watch([transform, impute], () => {
+  setQueryValues({ tx_bias_tf: transform.value, tx_bias_imp: impute.value });
+});
 
 const BASES = ["A", "T", "C", "G"];
 const DINUCS = ShowcaseTxConsts?.TX_DINUCS_ORDER || [
@@ -65,9 +91,11 @@ function meanDinucMap(type) {
   const rs = rows.value || [];
   const n = rs.length || 1;
   for (const r of rs) {
+    let vec = DINUCS.map((di) => safeNum(r?.[`${di}_${type}`], 0));
+    if (transform.value === "log1p") vec = vec.map((v) => Math.log1p(v));
+    if (transform.value === "clr") vec = clrTransform(vec, 1);
     for (const di of DINUCS) {
-      const v = safeNum(r?.[`${di}_${type}`], 0);
-      acc[di] += v;
+      acc[di] += vec[DINUCS.indexOf(di)] ?? 0;
     }
   }
   for (const di of DINUCS) acc[di] = acc[di] / n;
@@ -207,6 +235,19 @@ const atSkewHist = computed(() => {
 </script>
 
 <style scoped>
+.settings {
+  margin-bottom: 12px;
+}
+.settings-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.label {
+  font-size: 12px;
+  color: #606266;
+}
 .hdr {
   font-weight: 800;
   display: flex;

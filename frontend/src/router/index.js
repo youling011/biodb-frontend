@@ -6,6 +6,7 @@ import SpeciesDetail from '../views/SpeciesDetail.vue' // 单物种分析详情
 import MultiAnalysis from '../views/MultiAnalysis.vue' // 多物种对比
 import Prediction from '../views/Prediction.vue'
 import Help from '../views/Help.vue'
+import Integration from '../views/Integration.vue'
 
 const routes = [
     { 
@@ -43,6 +44,11 @@ const routes = [
         path: '/help', 
         name: 'Help', 
         component: Help 
+    },
+    {
+        path: '/integration',
+        name: 'Integration',
+        component: Integration
     },
 ]
 

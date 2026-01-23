@@ -47,6 +47,7 @@
                   <el-option label="Entropy" value="Sequence_Entropy" />
                   <el-option label="LZ complexity" value="LZ_complexity" />
                 </el-select>
+                <el-switch v-model="normalizeComplexity" size="small" active-text="Normalize" />
               </div>
             </div>
           </template>
@@ -137,7 +138,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 
@@ -145,6 +146,7 @@ import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
 import { buildScatterOption, buildHistOption, buildBoxplotOption } from "../shared/echartsKit";
 import { mean, pearson, cleanNumbers, boxplotStats } from "../shared/stats";
 import { safeNum, round } from "./transcriptomeUtils";
+import { getQueryString, setQueryValues } from "../../../utils/urlState";
 
 const props = defineProps({
   seed: { type: String, default: "TX:demo" },
@@ -160,6 +162,11 @@ const xField = ref("GC_content");
 const motifField = ref("H_ACA_box_freq");
 const complexityField = ref("Sequence_Entropy");
 const histMotif = ref("haca");
+const normalizeComplexity = ref(getQueryString("tx_comp_norm", "0") === "1");
+
+watch(normalizeComplexity, () => {
+  setQueryValues({ tx_comp_norm: normalizeComplexity.value ? 1 : 0 });
+});
 
 function num(v, dflt = null) {
   const n = Number(v);
@@ -308,9 +315,18 @@ const motifVsXOption = computed(() => {
 });
 
 const complexityScatterPoints = computed(() => {
+  const raw = topMotifRows.value.map((r) => num(r[complexityField.value], null));
+  let adjusted = raw;
+  if (normalizeComplexity.value) {
+    const finite = raw.filter((v) => Number.isFinite(v));
+    const meanVal = mean(finite) ?? 0;
+    const stdVal = Math.sqrt(mean(finite.map((v) => (v - meanVal) ** 2)) ?? 0) || 1;
+    adjusted = raw.map((v) => (Number.isFinite(v) ? (v - meanVal) / stdVal : null));
+  }
   const pts = [];
-  for (const r of topMotifRows.value) {
-    const x = num(r[complexityField.value], null);
+  for (let i = 0; i < topMotifRows.value.length; i++) {
+    const r = topMotifRows.value[i];
+    const x = adjusted[i];
     const y = num(r[motifField.value], null);
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
     pts.push({

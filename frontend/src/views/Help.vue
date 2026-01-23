@@ -14,6 +14,15 @@
       <el-collapse-item title="How to share a reproducible link?" name="4">
         <div class="content">Filters, tabs, and analysis parameters are stored in the URL. Copy the browser address bar to share or reproduce the same view.</div>
       </el-collapse-item>
+      <el-collapse-item title="What do HVG/DE parameters mean?" name="5">
+        <div class="content">HVG highlights highly variable genes; parameters like n_top_genes, min_mean/max_mean control the selection window. DE results include log2FC, p-value, and padj; Volcano/MA plots visualize these summaries. Full field definitions live in the Data Dictionary.</div>
+      </el-collapse-item>
+      <el-collapse-item title="What are CLR / compositional options?" name="6">
+        <div class="content">CLR/ALR are compositional transforms that reduce bias when working with proportions. Correlation and PCA panels allow choosing Pearson/Spearman/Robust and CLR/log1p preprocessing to make statistics more rigorous.</div>
+      </el-collapse-item>
+      <el-collapse-item title="What is Integration?" name="7">
+        <div class="content">Integration combines summary vectors across omics, performs joint PCA, and allows selecting samples to send to MultiAnalysis. Use the Integration page to explore cross-omics alignment.</div>
+      </el-collapse-item>
     </el-collapse>
   </div>
 </template>

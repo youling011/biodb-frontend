@@ -80,7 +80,46 @@
           </el-card>
         </el-col>
       </el-row>
+
+      <el-row :gutter="16" style="margin-top: 12px;">
+        <el-col :span="24">
+          <el-card shadow="never">
+            <template #header>
+              <div class="subhdr">
+                <span>Local Genome Window</span>
+                <div class="window-actions">
+                  <el-select v-model="anchorGene" placeholder="Anchor gene" style="width: 220px">
+                    <el-option v-for="g in anchorOptions" :key="g" :label="g" :value="g" />
+                  </el-select>
+                  <el-input-number v-model="windowSize" :min="1000" :max="50000" :step="1000" />
+                </div>
+              </div>
+            </template>
+            <div class="note">Window: ±{{ windowSize.toLocaleString() }} bp around selected gene.</div>
+            <EChart :option="windowOption" height="260px" />
+            <el-table :data="windowGenes" height="240" stripe @row-click="openGene">
+              <el-table-column prop="Gene_Name" label="Gene" width="160" />
+              <el-table-column prop="Contig" label="Contig" width="100" />
+              <el-table-column prop="Start" label="Start" width="120" />
+              <el-table-column prop="End" label="End" width="120" />
+              <el-table-column prop="Product" label="Product" />
+            </el-table>
+          </el-card>
+        </el-col>
+      </el-row>
     </el-card>
+
+    <el-drawer v-model="drawerOpen" title="Gene Detail" size="36%">
+      <div v-if="picked">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="Gene">{{ picked.Gene_Name }}</el-descriptions-item>
+          <el-descriptions-item label="Contig">{{ picked.Contig }}</el-descriptions-item>
+          <el-descriptions-item label="Coordinates">{{ picked.Start }}-{{ picked.End }}</el-descriptions-item>
+          <el-descriptions-item label="Product">{{ picked.Product }}</el-descriptions-item>
+          <el-descriptions-item label="GO terms">{{ picked.GO_terms?.join('; ') || '-' }}</el-descriptions-item>
+        </el-descriptions>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -129,6 +168,17 @@ defineExpose({ regenerate });
 onMounted(regenerate);
 watch(() => [props.seed, props.seedBump, props.rows], regenerate);
 
+watch(localRows, () => {
+  if (!anchorGene.value && localRows.value.length) {
+    anchorGene.value = localRows.value[0].Gene_Name;
+  }
+});
+
+function openGene(row) {
+  picked.value = row;
+  drawerOpen.value = true;
+}
+
 function downsample(rows, maxN = 3000) {
   const rs = rows || [];
   if (rs.length <= maxN) return rs;
@@ -145,6 +195,52 @@ const cats = computed(() => {
 const pgcRef = ref(null);
 const igRef = ref(null);
 const pnRef = ref(null);
+const drawerOpen = ref(false);
+const picked = ref(null);
+
+const anchorGene = ref("");
+const windowSize = ref(10000);
+
+const anchorOptions = computed(() => localRows.value.map((r) => r.Gene_Name).slice(0, 500));
+const anchorRow = computed(() => localRows.value.find((r) => r.Gene_Name === anchorGene.value) || localRows.value[0]);
+const windowGenes = computed(() => {
+  const anchor = anchorRow.value;
+  if (!anchor) return [];
+  const lo = anchor.Start - windowSize.value;
+  const hi = anchor.End + windowSize.value;
+  return (localRows.value || [])
+    .filter((r) => r.Contig === anchor.Contig)
+    .filter((r) => r.Start >= lo && r.End <= hi)
+    .sort((a, b) => a.Start - b.Start);
+});
+
+const windowOption = computed(() => {
+  const genes = windowGenes.value;
+  return {
+    grid: { left: 60, right: 20, top: 20, bottom: 30, containLabel: true },
+    xAxis: { type: "value", name: "Position (bp)" },
+    yAxis: { type: "category", data: genes.map((g) => g.Gene_Name) },
+    series: [
+      {
+        type: "custom",
+        renderItem: (params, api) => {
+          const start = api.value(0);
+          const end = api.value(1);
+          const y = api.coord([0, params.dataIndex])[1];
+          const xStart = api.coord([start, params.dataIndex])[0];
+          const xEnd = api.coord([end, params.dataIndex])[0];
+          const height = 10;
+          return {
+            type: "rect",
+            shape: { x: xStart, y: y - height / 2, width: xEnd - xStart, height },
+            style: api.style({ fill: "#4E79A7" }),
+          };
+        },
+        data: genes.map((g) => [g.Start, g.End]),
+      },
+    ],
+  };
+});
 
 const pgcOption = computed(() => {
   const rs = downsample(localRows.value, 2600);
@@ -333,6 +429,7 @@ function exportChart(chartRef, filename) {
 .ttl { display:flex; align-items:center; gap: 10px; flex-wrap: wrap; }
 .actions { display:flex; gap: 8px; flex-wrap: wrap; }
 .subhdr { display:flex; justify-content: space-between; align-items:center; gap: 10px; font-weight: 800; }
+.window-actions { display:flex; gap: 8px; align-items:center; }
 .note { color:#909399; font-size: 12px; margin: 6px 0 10px; }
 .mini { color:#909399; font-size: 12px; font-weight: 500; }
 </style>

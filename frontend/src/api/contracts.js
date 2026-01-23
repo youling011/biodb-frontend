@@ -23,6 +23,40 @@ export const RowsResponseContract = {
   offset: "number",
 };
 
+export const TranscriptomeQCContract = {
+  qc_metrics: "array",
+  normalization: "object",
+  data_layer: "object",
+  meta: "object",
+};
+
+export const TranscriptomeHVGContract = {
+  points: "array",
+  fit: "array",
+  hvg_table: "array",
+  meta: "object",
+};
+
+export const TranscriptomeDEContract = {
+  de_table: "array",
+  meta: "object",
+};
+
+export const GenomeRowContract = {
+  contig: "string",
+  start: "number",
+  end: "number",
+  strand: "string",
+  product: "string",
+  description: "string",
+  go_terms: "array",
+  kegg: "string",
+  cog: "string",
+  pfam: "string",
+  interpro: "string",
+  operon_id: "string",
+};
+
 export const MultiScreeningResponseContract = {
   volcano: "array",
   pca: "array",
