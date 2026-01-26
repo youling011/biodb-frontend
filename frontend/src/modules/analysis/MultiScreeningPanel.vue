@@ -384,6 +384,7 @@ const paramsSnapshot = computed(() => ({
   p: thresholdP.value,
   method: methodChoice.value,
   features: selectedFeatures.value,
+  only_significant: onlySignificant.value,
 }));
 
 const apiBase = String(import.meta.env.VITE_API_BASE_URL || "");
@@ -398,6 +399,7 @@ function hydrateFromUrl() {
   kw.value = getQueryString(`${p}Kw`, "");
   selectedFeatures.value = getQueryList(`${p}Feat`);
   methodChoice.value = getQueryString(`${p}Method`, "default");
+  onlySignificant.value = getQueryString(`${p}Sig`, "0") === "1";
 }
 
 function syncToUrl() {
@@ -409,20 +411,31 @@ function syncToUrl() {
     [`${p}P`]: thresholdP.value,
     [`${p}Kw`]: kw.value,
     [`${p}Method`]: methodChoice.value,
+    [`${p}Sig`]: onlySignificant.value ? 1 : 0,
   });
   setQueryList(`${p}Feat`, selectedFeatures.value);
 }
 
 let syncTimer = null;
-watch([groupA, groupB, thresholdFc, thresholdP, kw, selectedFeatures, methodChoice], () => {
+watch([groupA, groupB, thresholdFc, thresholdP, kw, selectedFeatures, methodChoice, onlySignificant], () => {
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = setTimeout(syncToUrl, 200);
 });
 
 function copyLink() {
   syncToUrl();
-  navigator.clipboard.writeText(window.location.href);
-  ElMessage.success("Link copied.");
+  const href = window.location.href;
+  if (!navigator.clipboard?.writeText) {
+    window.prompt("Copy this link:", href);
+    return;
+  }
+  navigator.clipboard.writeText(href)
+    .then(() => {
+      ElMessage.success("Link copied.");
+    })
+    .catch(() => {
+      window.prompt("Copy this link:", href);
+    });
 }
 
 watch(() => props.omics, hydrateFromUrl, { immediate: true });

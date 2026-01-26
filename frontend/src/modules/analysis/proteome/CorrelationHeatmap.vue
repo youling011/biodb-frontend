@@ -72,14 +72,19 @@ const selectedKeys = ref([...featureKeys]);
 const method = ref(getQueryString("prot_corr", "pearson"));
 const transform = ref(getQueryString("prot_tf", "none"));
 const impute = ref(getQueryString("prot_imp", "drop"));
-const absMode = ref(false);
+const absMode = ref(getQueryString("prot_abs", "0") === "1");
 const loading = ref(false);
 const progress = ref(0);
 const heatmapData = ref([]);
 let abortController = null;
 
-watch([method, transform, impute], () => {
-  setQueryValues({ prot_corr: method.value, prot_tf: transform.value, prot_imp: impute.value });
+watch([method, transform, impute, absMode], () => {
+  setQueryValues({
+    prot_corr: method.value,
+    prot_tf: transform.value,
+    prot_imp: impute.value,
+    prot_abs: absMode.value ? 1 : 0,
+  });
 });
 
 function cancelJob() {

@@ -50,7 +50,6 @@ watch([colorBy, transform, standardize], () => {
 });
 
 const option = computed(() => {
-  const feats = ["C", "H", "O", "N", "P", "S", "C:N", "C:P", "N:P"];
   const scores = scoresRef.value || [];
 
   const data = props.vectors.map((v, i) => ({
