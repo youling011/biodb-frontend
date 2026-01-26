@@ -94,7 +94,7 @@ export function useGenomeDataset(sampleIdRef, activeRef) {
     }
   }
 
-  async function ensureRows({ limit = 5000, offset = 0 } = {}) {
+  async function ensureRows({ limit = 5000, offset = 0, fields = "", sort_by = "", sort_dir = "", filter = "" } = {}) {
     rowsLoading.value = true;
     try {
       const { rows: genRows } = ensureGenomeRows({
@@ -108,7 +108,47 @@ export function useGenomeDataset(sampleIdRef, activeRef) {
       const start = Math.max(0, Number(offset) || 0);
       const end = Math.min(total, start + (Number(limit) || total));
 
-      rows.value = genRows.slice(start, end);
+      let sliced = genRows.slice(start, end);
+      if (filter && typeof filter === "object") {
+        sliced = sliced.filter((r) =>
+          Object.entries(filter).every(([k, v]) => {
+            const val = r?.[k];
+            if (v && typeof v === "object") {
+              const min = Number(v.min ?? -Infinity);
+              const max = Number(v.max ?? Infinity);
+              const n = Number(val);
+              return n >= min && n <= max;
+            }
+            if (Array.isArray(v)) return v.includes(val);
+            if (typeof v === "string") return String(val || "").includes(v);
+            return val === v;
+          })
+        );
+      }
+
+      if (fields) {
+        const wanted = Array.isArray(fields) ? fields : String(fields).split(",").map((f) => f.trim()).filter(Boolean);
+        if (wanted.length) {
+          sliced = sliced.map((r) => {
+            const out = {};
+            for (const k of wanted) out[k] = r?.[k];
+            return out;
+          });
+        }
+      }
+
+      if (sort_by) {
+        const dir = String(sort_dir || "asc").toLowerCase();
+        sliced = sliced.slice().sort((a, b) => {
+          const av = a?.[sort_by];
+          const bv = b?.[sort_by];
+          if (av === bv) return 0;
+          if (dir === "desc") return av > bv ? -1 : 1;
+          return av > bv ? 1 : -1;
+        });
+      }
+
+      rows.value = sliced;
       pagination.value = { total, offset: start, limit: end - start };
 
       observed.value = computeObserved(genRows);

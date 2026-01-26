@@ -10,6 +10,18 @@
           <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
         </el-select>
 
+        <el-select v-model="goFilter" clearable placeholder="GO term" style="width: 160px">
+          <el-option v-for="g in goOptions" :key="g" :label="g" :value="g" />
+        </el-select>
+
+        <el-select v-model="keggFilter" clearable placeholder="KEGG" style="width: 140px">
+          <el-option v-for="k in keggOptions" :key="k" :label="k" :value="k" />
+        </el-select>
+
+        <el-select v-model="cogFilter" clearable placeholder="COG" style="width: 140px">
+          <el-option v-for="c in cogOptions" :key="c" :label="c" :value="c" />
+        </el-select>
+
         <el-switch v-model="codingOnly" active-text="Coding only" />
 
         <el-select v-model="columnKeys" multiple collapse-tags collapse-tags-tooltip placeholder="Columns" style="min-width: 320px">
@@ -21,17 +33,13 @@
         </el-button>
       </div>
 
-      <el-table :data="pageRows" stripe height="520" @row-click="openRow">
-        <el-table-column
-          v-for="c in tableColumns"
-          :key="c.key"
-          :prop="c.key"
-          :label="c.label"
-          :width="c.width"
-          :sortable="c.sortable"
-          :fixed="c.fixed"
-        />
-      </el-table>
+      <VirtualTable
+        :data="pageRows"
+        :columns="tableColumns"
+        :height="520"
+        row-key="Gene_Name"
+        @row-click="openRow"
+      />
 
       <div class="pager">
         <el-pagination
@@ -50,11 +58,21 @@
           <el-descriptions-item label="Gene">{{ picked.Gene_Name }}</el-descriptions-item>
           <el-descriptions-item label="Category">{{ picked.Function_Category }}</el-descriptions-item>
           <el-descriptions-item label="Strand">{{ picked.Strand }}</el-descriptions-item>
+          <el-descriptions-item label="Contig">{{ picked.Contig }}</el-descriptions-item>
+          <el-descriptions-item label="Coordinates">{{ picked.Start }} - {{ picked.End }}</el-descriptions-item>
+          <el-descriptions-item label="Product">{{ picked.Product }}</el-descriptions-item>
+          <el-descriptions-item label="Description">{{ picked.Description }}</el-descriptions-item>
+          <el-descriptions-item label="GO terms">{{ picked.GO_terms?.join("; ") || "-" }}</el-descriptions-item>
+          <el-descriptions-item label="KEGG">{{ picked.KEGG || "-" }}</el-descriptions-item>
+          <el-descriptions-item label="COG">{{ picked.COG || "-" }}</el-descriptions-item>
+          <el-descriptions-item label="Pfam">{{ picked.Pfam || "-" }}</el-descriptions-item>
+          <el-descriptions-item label="InterPro">{{ picked.InterPro || "-" }}</el-descriptions-item>
           <el-descriptions-item label="Length(bp)">{{ picked.Length_bp }}</el-descriptions-item>
           <el-descriptions-item label="GC(%)">{{ picked.GC_Content_Percent }}</el-descriptions-item>
           <el-descriptions-item label="C:N">{{ picked.C_N_Ratio }}</el-descriptions-item>
           <el-descriptions-item label="N:P">{{ picked.N_P_Ratio }}</el-descriptions-item>
         </el-descriptions>
+        <el-button style="margin-top: 8px" @click="copyCoordinates">Copy Coordinates</el-button>
 
         <el-row :gutter="12" style="margin-top: 12px;">
           <el-col :span="12">
@@ -102,9 +120,10 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
+import VirtualTable from "../../../components/VirtualTable.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { buildBarOption, buildHeatmapOption } from "../shared/echartsKit";
-import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../shared/showcaseKit";
+import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";
 
 // Showcase-first tab: self-generates data + options + table schema.
 // Backward compatible with parent passing rows/categories, but unused by default.
@@ -137,6 +156,9 @@ watch(() => [props.seed, props.seedBump], regenerate);
 const kw = ref("");
 const cat = ref("");
 const codingOnly = ref(false);
+const goFilter = ref("");
+const keggFilter = ref("");
+const cogFilter = ref("");
 
 const page = ref(1);
 const pageSize = 50;
@@ -152,15 +174,37 @@ const categories = computed(() => {
   return arr;
 });
 
+const goOptions = computed(() => {
+  const s = new Set();
+  for (const r of localRows.value) {
+    const terms = Array.isArray(r.GO_terms) ? r.GO_terms : [];
+    terms.forEach((t) => s.add(String(t)));
+  }
+  return Array.from(s).sort();
+});
+
+const keggOptions = computed(() => {
+  const s = new Set(localRows.value.map((r) => r.KEGG).filter(Boolean));
+  return Array.from(s).sort();
+});
+
+const cogOptions = computed(() => {
+  const s = new Set(localRows.value.map((r) => r.COG).filter(Boolean));
+  return Array.from(s).sort();
+});
+
 const filtered = computed(() => {
   const k = kw.value.trim().toLowerCase();
   return (localRows.value || [])
     .filter((r) => (k ? String(r.Gene_Name || "").toLowerCase().includes(k) : true))
     .filter((r) => (cat.value ? String(r.Function_Category || "") === cat.value : true))
+    .filter((r) => (goFilter.value ? (r.GO_terms || []).includes(goFilter.value) : true))
+    .filter((r) => (keggFilter.value ? String(r.KEGG || "") === keggFilter.value : true))
+    .filter((r) => (cogFilter.value ? String(r.COG || "") === cogFilter.value : true))
     .filter((r) => (codingOnly.value ? String(r.Function_Category || "") !== "none" : true));
 });
 
-watch([kw, cat, codingOnly], () => {
+watch([kw, cat, codingOnly, goFilter, keggFilter, cogFilter], () => {
   page.value = 1;
 });
 
@@ -175,6 +219,10 @@ const allColumnKeys = [
   "Gene_Name",
   "Function_Category",
   "Strand",
+  "Contig",
+  "Start",
+  "End",
+  "Product",
   "Length_bp",
   "GC_Content_Percent",
   "C_N_Ratio",
@@ -190,6 +238,10 @@ const labelMap = {
   Gene_Name: "Gene",
   Function_Category: "Category",
   Strand: "Strand",
+  Contig: "Contig",
+  Start: "Start",
+  End: "End",
+  Product: "Product",
   Length_bp: "Length",
   GC_Content_Percent: "GC%",
   C_N_Ratio: "C:N",
@@ -205,6 +257,10 @@ const widthMap = {
   Gene_Name: 170,
   Function_Category: 150,
   Strand: 90,
+  Contig: 110,
+  Start: 110,
+  End: 110,
+  Product: 180,
   Length_bp: 110,
   GC_Content_Percent: 110,
   C_N_Ratio: 110,
@@ -218,6 +274,12 @@ const widthMap = {
 
 function columnLabel(k) {
   return labelMap[k] || k;
+}
+
+function copyCoordinates() {
+  if (!picked.value) return;
+  const text = `${picked.value.Contig}:${picked.value.Start}-${picked.value.End}`;
+  navigator.clipboard.writeText(text);
 }
 
 const columnKeys = ref([

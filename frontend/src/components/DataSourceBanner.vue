@@ -28,6 +28,14 @@ Usage suggestion (not part of required changes):
         <div v-if="state.last_error" class="data-source-banner__error">
           {{ state.last_error }}
         </div>
+        <div class="data-source-banner__meta">
+          <span>API Base: {{ state.api_base || '-' }}</span>
+        </div>
+        <div class="data-source-banner__actions">
+          <el-button size="small" @click="setDataMode('backend')">Try Backend</el-button>
+          <el-button size="small" type="primary" plain @click="setDataMode('demo')">Switch to Demo</el-button>
+          <el-button size="small" @click="$emit('retry')">Retry</el-button>
+        </div>
       </div>
     </el-alert>
   </div>
@@ -36,7 +44,9 @@ Usage suggestion (not part of required changes):
 <script setup>
 import { useDataSourceStore } from "../stores/dataSource";
 
-const { state, banner } = useDataSourceStore();
+defineEmits(["retry"]);
+
+const { state, banner, setDataMode } = useDataSourceStore();
 </script>
 
 <style scoped>
@@ -65,5 +75,16 @@ const { state, banner } = useDataSourceStore();
   opacity: 0.85;
   font-size: 12px;
   word-break: break-word;
+}
+.data-source-banner__meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #606266;
+}
+.data-source-banner__actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

@@ -39,6 +39,20 @@
           <el-option label="GC bins: 20%" :value="20" />
         </el-select>
       </template>
+      <template v-else>
+        <el-select v-model="transform" style="width: 140px">
+          <el-option label="None" value="none" />
+          <el-option label="log1p" value="log1p" />
+          <el-option label="CLR" value="clr" />
+        </el-select>
+        <el-select v-model="impute" style="width: 140px">
+          <el-option label="drop" value="drop" />
+          <el-option label="zero" value="zero" />
+          <el-option label="pseudocount" value="pseudocount" />
+          <el-option label="median" value="median" />
+        </el-select>
+        <el-switch v-model="standardize" active-text="Standardize" />
+      </template>
 
       <el-button icon="Refresh" @click="bumpSeed" style="margin-left:auto">Recompute</el-button>
     </div>
@@ -57,10 +71,10 @@
 import { computed, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
 import { safeNum, round } from "./transcriptomeUtils";
-import { pca } from "../shared/pca";
+import { runPCA } from "../shared/pca";
 import { buildScatterOption, buildHeatmapOption } from "../shared/echartsKit";
 import { variance, mean, toNumber } from "../shared/stats";
-import { makeTranscriptomeRows } from "../shared/showcaseKit";
+import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
 
 const props = defineProps({
   seed: { type: String, default: "TX:demo" },
@@ -86,6 +100,9 @@ const mode = ref("codon");
 const sampleN = ref(1500);
 const topK = ref(30);
 const gcBinWidth = ref(10);
+const transform = ref("none");
+const impute = ref("drop");
+const standardize = ref(true);
 
 // A small deterministic bump to recompute PCA / fingerprint when user clicks.
 const recomputeSeed = ref(0);
@@ -159,7 +176,14 @@ const pcaOption = computed(() => {
   const X = vectorizeRows(rs, keys);
 
   // PCA on standardized features
-  const res = pca(X, { k: 2, standardize: true, seed: 42 + recomputeSeed.value });
+  const res = runPCA(X, {
+    k: 2,
+    standardize: standardize.value,
+    log1p: transform.value === "log1p",
+    clr: transform.value === "clr",
+    impute: impute.value,
+    seed: 42 + recomputeSeed.value,
+  });
   const scores = res?.scores || [];
 
   const pts = rs.map((r, i) => {

@@ -1,5 +1,7 @@
 <script setup>
 import DataSourceBanner from './components/DataSourceBanner.vue'
+
+const currentYear = new Date().getFullYear()
 </script>
 
 <template>
@@ -28,6 +30,7 @@ import DataSourceBanner from './components/DataSourceBanner.vue'
           <el-menu-item index="/">Home</el-menu-item>
           <el-menu-item index="/browse">Browse Data</el-menu-item>
           <el-menu-item index="/analysis">Analysis Tools</el-menu-item>
+          <el-menu-item index="/integration">Integration</el-menu-item>
           <el-menu-item index="/prediction">Prediction</el-menu-item>
           <el-menu-item index="/help">Help</el-menu-item>
         </el-menu>
@@ -45,7 +48,7 @@ import DataSourceBanner from './components/DataSourceBanner.vue'
 
     <el-footer class="app-footer">
       <div class="footer-content">
-        <p>&copy; 2026 Ecological & Biological Stoichiometry Research Group.</p>
+        <p>&copy; {{ currentYear }} Ecological & Biological Stoichiometry Research Group.</p>
         <p class="footer-sub">Supported by Django & Vue3 | High-Performance Omics Analysis</p>
       </div>
     </el-footer>

@@ -1,11 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../views/Home.vue'
-import Browse from '../views/Browse.vue'
-import Analysis from '../views/Analysis.vue'           // 新增：分析模块聚合页
-import SpeciesDetail from '../views/SpeciesDetail.vue' // 单物种分析详情
-import MultiAnalysis from '../views/MultiAnalysis.vue' // 多物种对比
-import Prediction from '../views/Prediction.vue'
-import Help from '../views/Help.vue'
+const Home = () => import("../views/Home.vue");
+const Browse = () => import("../views/Browse.vue");
+const Analysis = () => import("../views/Analysis.vue");
+const SpeciesDetail = () => import("../views/SpeciesDetail.vue");
+const MultiAnalysis = () => import("../views/MultiAnalysis.vue");
+const Prediction = () => import("../views/Prediction.vue");
+const Help = () => import("../views/Help.vue");
+const Integration = () => import("../views/Integration.vue");
 
 const routes = [
     { 
@@ -43,6 +44,11 @@ const routes = [
         path: '/help', 
         name: 'Help', 
         component: Help 
+    },
+    {
+        path: '/integration',
+        name: 'Integration',
+        component: Integration
     },
 ]
 

@@ -5,6 +5,13 @@
       <p>Separated by omics modules for independent iteration and optimization.</p>
     </div>
 
+    <div class="cohort-bar">
+      <el-select v-model="selectedCohort" placeholder="Load cohort" clearable style="width: 260px">
+        <el-option v-for="c in cohorts" :key="c.id" :label="c.name" :value="c.id" />
+      </el-select>
+      <el-button @click="applyCohort" :disabled="!selectedCohort">Apply to Group A</el-button>
+    </div>
+
     <el-tabs v-model="omicsTab" type="border-card">
       <el-tab-pane label="Genome" name="GENOME" lazy>
         <MultiScreeningPanel
@@ -26,41 +33,42 @@
         />
       </el-tab-pane>
 
-      <!-- Proteome is intentionally disabled in the current phase.
-           Keep the tab for UX continuity, but do NOT trigger multi_screening or mock generation. -->
       <el-tab-pane label="Proteome" name="PROTEOME" lazy>
-        <div class="disabled-pane">
-          <el-alert
-            title="Proteome module is not available"
-            type="warning"
-            :closable="false"
-            show-icon
-            description="Proteome data simulation and analysis APIs are disabled in this phase. This tab is reserved for future iterations."
-          />
-          <el-empty description="No proteome data available yet." />
-        </div>
+        <MultiScreeningPanel
+          title="Proteome Multi-Species Screening"
+          omics="PROTEOME"
+          :active="omicsTab === 'PROTEOME'"
+          :samples="samples"
+          :prefill-group-a="prefillGroupA"
+        />
       </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
+import { useRoute } from "vue-router";
 import { getSamples } from "../api";
 import MultiScreeningPanel from "../modules/analysis/MultiScreeningPanel.vue";
+import { getQueryString, setQueryValues } from "../utils/urlState";
+import { listCohorts, getCohort } from "../utils/cohortStore";
 
 const loading = ref(false);
 const samples = ref([]);
-const omicsTab = ref("GENOME");
+const omicsTab = ref(getQueryString("omics", "GENOME"));
+const route = useRoute();
 
 // From Browse “Compare Selected” (if exists)
 const prefillGroupA = ref([]);
+const cohorts = ref(listCohorts());
+const selectedCohort = ref("");
 
 async function loadSamples() {
   loading.value = true;
   try {
-    const data = await getSamples();
-    samples.value = Array.isArray(data) ? data : [];
+    const data = await getSamples({ limit: 200, offset: 0 });
+    samples.value = Array.isArray(data?.items) ? data.items : [];
   } finally {
     loading.value = false;
   }
@@ -73,9 +81,24 @@ async function loadSamples() {
       localStorage.removeItem("biostoich_selected_samples");
     }
   } catch {}
+
+  const selectedQuery = String(route.query?.selected || "");
+  if (selectedQuery) {
+    prefillGroupA.value = selectedQuery.split(",").map((x) => Number(x)).filter((x) => Number.isFinite(x));
+  }
 }
 
 onMounted(loadSamples);
+
+watch(omicsTab, () => {
+  setQueryValues({ omics: omicsTab.value });
+});
+
+function applyCohort() {
+  const cohort = getCohort(selectedCohort.value);
+  if (!cohort) return;
+  prefillGroupA.value = cohort.ids || [];
+}
 </script>
 
 <style scoped>
@@ -88,12 +111,11 @@ onMounted(loadSamples);
 .header {
   margin-bottom: 16px;
 }
-
-.disabled-pane {
-  padding: 16px;
-}
-
-.disabled-pane :deep(.el-alert) {
+.cohort-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
   margin-bottom: 12px;
 }
+
 </style>

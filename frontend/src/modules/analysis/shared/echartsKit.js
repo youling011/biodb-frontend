@@ -1,3 +1,5 @@
+import { sampleScatterPoints, sampleHeatmapValues } from "./stats";
+
 /**
  * ECharts option kit
  *
@@ -204,10 +206,13 @@ export function buildScatterOption(data, cfg = {}) {
     toolbox = true,
     tooltipFormatter = null,
     extra = {},
+    maxPoints = 50000,
+    samplingStrategy = "grid",
   } = cfg;
 
   const points = (data && Array.isArray(data.points)) ? data.points : [];
-  const norm = points.map((p) => {
+  const { points: sampled, lod } = sampleScatterPoints(points, { maxPoints, strategy: samplingStrategy });
+  const norm = sampled.map((p) => {
     if (Array.isArray(p)) return { value: [asNumber(p[0], null), asNumber(p[1], null)] };
     if (p && typeof p === "object") {
       const x = asNumber(p.x, null);
@@ -221,6 +226,7 @@ export function buildScatterOption(data, cfg = {}) {
   }).filter((it) => isFiniteNumber(it.value[0]) && isFiniteNumber(it.value[1]));
 
   const opt = {
+    meta: { lod },
     title: normalizeTitle(title),
     grid: defaultGrid(),
     tooltip: defaultTooltip({
@@ -252,6 +258,123 @@ export function buildScatterOption(data, cfg = {}) {
   };
 
   return merge(opt, extra);
+}
+
+export function buildMeanVarOption(data, cfg = {}) {
+  const {
+    title = "Mean-Variance",
+    xName = "Mean",
+    yName = "Variance",
+    toolbox = true,
+    dataZoom = true,
+    highlightColor = "#E8743B",
+    fitColor = "#2E7D32",
+    maxPoints = 50000,
+    samplingStrategy = "grid",
+  } = cfg;
+
+  const points = Array.isArray(data?.points) ? data.points : [];
+  const { points: sampled, lod } = sampleScatterPoints(points, { maxPoints, strategy: samplingStrategy });
+  const fit = Array.isArray(data?.fit) ? data.fit : [];
+
+  return {
+    meta: { lod },
+    title: normalizeTitle(title),
+    grid: defaultGrid(),
+    tooltip: defaultTooltip({ trigger: "item" }),
+    toolbox: defaultToolbox({ enable: toolbox }),
+    dataZoom: maybeDataZoom({ enable: Boolean(dataZoom), axis: "both" }),
+    xAxis: { type: "value", ...defaultAxisCommon({ name: xName }) },
+    yAxis: { type: "value", ...defaultAxisCommon({ name: yName }) },
+    series: [
+      {
+        type: "scatter",
+        data: sampled.map((p) => ({
+          value: [asNumber(p.mean, 0), asNumber(p.variance ?? p.dispersion, 0)],
+          name: p.gene,
+          itemStyle: p.is_hvg ? { color: highlightColor } : undefined,
+        })),
+        symbolSize: 6,
+      },
+      {
+        type: "line",
+        data: fit.map((p) => [asNumber(p.x, 0), asNumber(p.y, 0)]),
+        showSymbol: false,
+        lineStyle: { color: fitColor, width: 2 },
+      },
+    ],
+  };
+}
+
+export function buildVolcanoOption(data, cfg = {}) {
+  const {
+    title = "Volcano Plot",
+    xName = "log2FC",
+    yName = "-log10(padj)",
+    fcThreshold = 1,
+    pThreshold = 0.05,
+    maxPoints = 50000,
+    samplingStrategy = "grid",
+  } = cfg;
+
+  const points = Array.isArray(data?.points) ? data.points : [];
+  const { points: sampled, lod } = sampleScatterPoints(points, { maxPoints, strategy: samplingStrategy });
+  const thresholdLine = -Math.log10(Math.max(pThreshold, 1e-12));
+
+  return {
+    meta: { lod },
+    title: normalizeTitle(title),
+    grid: defaultGrid(),
+    tooltip: defaultTooltip({ trigger: "item" }),
+    toolbox: defaultToolbox({ enable: true }),
+    xAxis: { type: "value", ...defaultAxisCommon({ name: xName }) },
+    yAxis: { type: "value", ...defaultAxisCommon({ name: yName }) },
+    series: [
+      {
+        type: "scatter",
+        data: sampled.map((p) => [asNumber(p.log2fc, 0), asNumber(p.neglog10p, 0), p.gene]),
+        symbolSize: 6,
+      },
+    ],
+    markLine: {
+      symbol: "none",
+      data: [
+        { xAxis: fcThreshold },
+        { xAxis: -fcThreshold },
+        { yAxis: thresholdLine },
+      ],
+    },
+  };
+}
+
+export function buildMAOption(data, cfg = {}) {
+  const {
+    title = "MA Plot",
+    xName = "Mean Expression",
+    yName = "log2FC",
+    maxPoints = 50000,
+    samplingStrategy = "grid",
+  } = cfg;
+
+  const points = Array.isArray(data?.points) ? data.points : [];
+  const { points: sampled, lod } = sampleScatterPoints(points, { maxPoints, strategy: samplingStrategy });
+
+  return {
+    meta: { lod },
+    title: normalizeTitle(title),
+    grid: defaultGrid(),
+    tooltip: defaultTooltip({ trigger: "item" }),
+    toolbox: defaultToolbox({ enable: true }),
+    xAxis: { type: "value", ...defaultAxisCommon({ name: xName }) },
+    yAxis: { type: "value", ...defaultAxisCommon({ name: yName }) },
+    series: [
+      {
+        type: "scatter",
+        data: sampled.map((p) => [asNumber(p.mean, 0), asNumber(p.log2fc, 0), p.gene]),
+        symbolSize: 6,
+      },
+    ],
+  };
 }
 
 /**
@@ -346,16 +469,19 @@ export function buildHeatmapOption(data, cfg = {}) {
     toolbox = true,
     tooltipFormatter = null,
     extra = {},
+    maxCells = 40000,
   } = cfg;
 
   const xLabels = (data && Array.isArray(data.xLabels)) ? data.xLabels.map(String) : [];
   const yLabels = (data && Array.isArray(data.yLabels)) ? data.yLabels.map(String) : [];
-  const values = (data && Array.isArray(data.values)) ? data.values : [];
+  const valuesRaw = (data && Array.isArray(data.values)) ? data.values : [];
+  const { values, lod } = sampleHeatmapValues(valuesRaw, { maxCells });
 
   const vMin = isFiniteNumber(visualMin) ? Number(visualMin) : null;
   const vMax = isFiniteNumber(visualMax) ? Number(visualMax) : null;
 
   const opt = {
+    meta: { lod },
     title: normalizeTitle(title),
     grid: { left: 80, right: 30, top: 34, bottom: 60, containLabel: true },
     tooltip: defaultTooltip({
