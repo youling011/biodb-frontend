@@ -16,7 +16,7 @@
       <template #header>
         <div class="hdr">Joint PCA</div>
       </template>
-      <EChart ref="chartRef" :option="option" height="520px" />
+      <EChart ref="chartRef" :option="option" height="520px" :loading="loading" />
       <div class="note">Use brush selection to select samples and push to MultiAnalysis.</div>
     </el-card>
   </div>
@@ -25,8 +25,8 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
-import { runPCA } from "../shared/pca";
 import { setQueryList, setQueryValues, getQueryString } from "../../../utils/urlState";
+import { runWorkerJob } from "../../../utils/jobClient";
 
 const props = defineProps({
   vectors: { type: Array, default: () => [] },
@@ -37,6 +37,9 @@ const colorBy = ref(getQueryString("int_color", "taxonomy"));
 const transform = ref(getQueryString("int_pca_tf", "none"));
 const standardize = ref(getQueryString("int_pca_std", "1") !== "0");
 const chartRef = ref(null);
+const loading = ref(false);
+const scoresRef = ref([]);
+let abortController = null;
 
 watch([colorBy, transform, standardize], () => {
   setQueryValues({
@@ -47,14 +50,7 @@ watch([colorBy, transform, standardize], () => {
 });
 
 const option = computed(() => {
-  const feats = ["C", "H", "O", "N", "P", "S", "C:N", "C:P", "N:P"];
-  const matrix = props.vectors.map((v) => feats.map((k) => Number(v.vector?.[k] || 0)));
-  const res = runPCA(matrix, {
-    k: 2,
-    standardize: standardize.value,
-    clr: transform.value === "clr",
-  });
-  const scores = res.scores || [];
+  const scores = scoresRef.value || [];
 
   const data = props.vectors.map((v, i) => ({
     value: [scores?.[i]?.[0] ?? 0, scores?.[i]?.[1] ?? 0],
@@ -82,6 +78,28 @@ const option = computed(() => {
   };
 });
 
+async function runPcaJob() {
+  if (!props.vectors.length) {
+    scoresRef.value = [];
+    return;
+  }
+  abortController?.abort();
+  abortController = new AbortController();
+  loading.value = true;
+  try {
+    const feats = ["C", "H", "O", "N", "P", "S", "C:N", "C:P", "N:P"];
+    const matrix = props.vectors.map((v) => feats.map((k) => Number(v.vector?.[k] || 0)));
+    const res = await runWorkerJob(
+      "pca",
+      { matrix, options: { k: 2, standardize: standardize.value, clr: transform.value === "clr" } },
+      { signal: abortController.signal }
+    );
+    scoresRef.value = res?.scores || [];
+  } finally {
+    loading.value = false;
+  }
+}
+
 function clearSelection() {
   emit("selection", []);
   setQueryList("selected", []);
@@ -107,6 +125,7 @@ function bindBrush() {
 
 onMounted(bindBrush);
 watch(option, bindBrush);
+watch([() => props.vectors, transform, standardize], runPcaJob, { immediate: true, deep: true });
 </script>
 
 <style scoped>

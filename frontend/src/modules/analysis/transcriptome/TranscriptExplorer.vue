@@ -28,18 +28,13 @@
         </div>
       </div>
 
-      <el-table :data="pageRows" stripe height="520" @row-click="openRow">
-        <el-table-column
-          v-for="c in tableColumns"
-          :key="c.key"
-          :prop="c.key"
-          :label="c.label"
-          :width="c.width"
-          :min-width="c.minWidth"
-          :fixed="c.fixed"
-          :sortable="c.sortable"
-        />
-      </el-table>
+      <VirtualTable
+        :data="pageRows"
+        :columns="tableColumns"
+        :height="520"
+        row-key="Gene_Name"
+        @row-click="openRow"
+      />
 
       <div class="pager">
         <el-pagination
@@ -123,6 +118,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
+import VirtualTable from "../../../components/VirtualTable.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { safeNum, extractDinucMatrix, extractTopTrinuc, round } from "./transcriptomeUtils";
 import { makeTranscriptomeRows } from "../../../api/showcaseAdapter";
