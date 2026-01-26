@@ -23,21 +23,27 @@
     <el-tabs v-model="omicsTab" type="border-card" class="omics-tabs">
       <el-tab-pane label="Genome" name="GENOME" lazy>
         <div v-if="omicsIds.GENOME">
-          <GenomeAnalysis :sample-id="omicsIds.GENOME" :active="omicsTab === 'GENOME'" />
+          <KeepAlive include="GenomeAnalysis,TranscriptomeAnalysis,ProteomeAnalysis">
+            <GenomeAnalysis :sample-id="omicsIds.GENOME" :active="omicsTab === 'GENOME'" />
+          </KeepAlive>
         </div>
         <el-empty v-else description="Genome sample not found for this species." />
       </el-tab-pane>
 
       <el-tab-pane label="Transcriptome" name="TRANSCRIPTOME" lazy>
         <div v-if="omicsIds.TRANSCRIPTOME">
-          <TranscriptomeAnalysis :sample-id="omicsIds.TRANSCRIPTOME" :active="omicsTab === 'TRANSCRIPTOME'" />
+          <KeepAlive include="GenomeAnalysis,TranscriptomeAnalysis,ProteomeAnalysis">
+            <TranscriptomeAnalysis :sample-id="omicsIds.TRANSCRIPTOME" :active="omicsTab === 'TRANSCRIPTOME'" />
+          </KeepAlive>
         </div>
         <el-empty v-else description="Transcriptome sample not found for this species." />
       </el-tab-pane>
 
       <el-tab-pane label="Proteome" name="PROTEOME" lazy>
         <!-- Proteome is a placeholder; keep UI but do not imply data exists -->
-        <ProteomeAnalysis :sample-id="omicsIds.PROTEOME || omicsIds.GENOME || omicsIds.TRANSCRIPTOME || id" :active="omicsTab === 'PROTEOME'" />
+        <KeepAlive include="GenomeAnalysis,TranscriptomeAnalysis,ProteomeAnalysis">
+          <ProteomeAnalysis :sample-id="omicsIds.PROTEOME || omicsIds.GENOME || omicsIds.TRANSCRIPTOME || id" :active="omicsTab === 'PROTEOME'" />
+        </KeepAlive>
       </el-tab-pane>
     </el-tabs>
   </div>

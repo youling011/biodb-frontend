@@ -19,6 +19,8 @@
       </el-select>
       <el-switch v-model="absMode" active-text="Absolute" />
       <el-tag size="small" type="info" effect="plain">method: {{ method }}</el-tag>
+      <el-tag v-if="loading" size="small" type="warning" effect="plain">Computing {{ Math.round(progress * 100) }}%</el-tag>
+      <el-button v-if="loading" size="small" @click="cancelJob">Cancel</el-button>
       <el-popover placement="bottom" :width="380" trigger="click">
         <template #reference>
           <el-button>Features</el-button>
@@ -33,7 +35,7 @@
 
     <el-card>
       <template #header><div class="hdr">Correlation Heatmap</div></template>
-      <EChart :option="heatmapOption" height="520px" />
+      <EChart :option="heatmapOption" height="520px" :loading="loading" />
     </el-card>
   </div>
 </template>
@@ -41,8 +43,8 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
-import { clrTransform, median, pearson, robustCorr, spearmanCorr } from "../shared/stats";
 import { getQueryString, setQueryValues } from "../../../utils/urlState";
+import { runWorkerJob } from "../../../utils/jobClient";
 
 const props = defineProps({
   rows: { type: Array, default: () => [] },
@@ -70,44 +72,60 @@ const selectedKeys = ref([...featureKeys]);
 const method = ref(getQueryString("prot_corr", "pearson"));
 const transform = ref(getQueryString("prot_tf", "none"));
 const impute = ref(getQueryString("prot_imp", "drop"));
-const absMode = ref(false);
+const absMode = ref(getQueryString("prot_abs", "0") === "1");
+const loading = ref(false);
+const progress = ref(0);
+const heatmapData = ref([]);
+let abortController = null;
 
-watch([method, transform, impute], () => {
-  setQueryValues({ prot_corr: method.value, prot_tf: transform.value, prot_imp: impute.value });
+watch([method, transform, impute, absMode], () => {
+  setQueryValues({
+    prot_corr: method.value,
+    prot_tf: transform.value,
+    prot_imp: impute.value,
+    prot_abs: absMode.value ? 1 : 0,
+  });
 });
 
-function prepareSeries(values) {
-  const arr = values.map((v) => Number(v));
-  if (impute.value === "drop") return arr.filter((v) => Number.isFinite(v));
-  if (impute.value === "zero") return arr.map((v) => (Number.isFinite(v) ? v : 0));
-  if (impute.value === "pseudocount") return arr.map((v) => (Number.isFinite(v) ? v : 1));
-  if (impute.value === "median") {
-    const med = median(arr.filter((v) => Number.isFinite(v))) || 0;
-    return arr.map((v) => (Number.isFinite(v) ? v : med));
+function cancelJob() {
+  abortController?.abort();
+  abortController = null;
+  loading.value = false;
+}
+
+async function runJob() {
+  if (!props.rows.length) {
+    heatmapData.value = [];
+    return;
   }
-  return arr;
+  cancelJob();
+  abortController = new AbortController();
+  loading.value = true;
+  progress.value = 0;
+  try {
+    const keys = selectedKeys.value.length ? selectedKeys.value : featureKeys;
+    const data = await runWorkerJob(
+      "corr",
+      { rows: props.rows, keys, method: method.value, transform: transform.value, impute: impute.value },
+      {
+        signal: abortController.signal,
+        onProgress: (p) => {
+          progress.value = p;
+        },
+      }
+    );
+    heatmapData.value = data || [];
+  } finally {
+    loading.value = false;
+    progress.value = 0;
+  }
 }
 
 const heatmapOption = computed(() => {
   const keys = selectedKeys.value.length ? selectedKeys.value : featureKeys;
-  const data = [];
-  const calc = method.value === "spearman" ? spearmanCorr : method.value === "robust" ? robustCorr : pearson;
-  keys.forEach((a, i) => {
-    keys.forEach((b, j) => {
-      let xs = prepareSeries(props.rows.map((r) => r[a]));
-      let ys = prepareSeries(props.rows.map((r) => r[b]));
-      if (transform.value === "log1p") {
-        xs = xs.map((v) => Math.log1p(Math.max(0, v)));
-        ys = ys.map((v) => Math.log1p(Math.max(0, v)));
-      }
-      if (transform.value === "clr") {
-        xs = clrTransform(xs, 1);
-        ys = clrTransform(ys, 1);
-      }
-      let v = calc(xs, ys);
-      if (absMode.value) v = Math.abs(v);
-      data.push([j, i, Number(v.toFixed(3))]);
-    });
+  const data = (heatmapData.value || []).map((d) => {
+    if (!absMode.value) return d;
+    return [d[0], d[1], Math.abs(d[2])];
   });
   return {
     tooltip: { position: "top" },
@@ -118,6 +136,8 @@ const heatmapOption = computed(() => {
     series: [{ type: "heatmap", data }],
   };
 });
+
+watch([() => props.rows, method, transform, impute, selectedKeys], runJob, { immediate: true, deep: true });
 </script>
 
 <style scoped>

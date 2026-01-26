@@ -51,12 +51,12 @@
               </div>
             </template>
             <el-input v-model="kw" placeholder="Search gene" clearable style="margin-bottom: 8px" />
-            <el-table :data="filteredTable" height="360" stripe>
-              <el-table-column prop="gene" label="Gene" width="140" />
-              <el-table-column prop="mean" label="Mean" width="100" />
-              <el-table-column prop="variance" label="Var" width="100" />
-              <el-table-column prop="score" label="Score" />
-            </el-table>
+            <VirtualTable
+              :data="filteredTable"
+              :columns="tableColumns"
+              :height="360"
+              row-key="gene"
+            />
           </el-card>
         </el-col>
       </el-row>
@@ -68,6 +68,7 @@
 import { computed, ref, watch } from "vue";
 import AsyncStateBlock from "../../../components/AsyncStateBlock.vue";
 import EChart from "../../../components/EChart.vue";
+import VirtualTable from "../../../components/VirtualTable.vue";
 import { getTranscriptomeHVG } from "../../../api";
 import { buildMeanVarOption } from "../shared/echartsKit";
 import { getQueryNumber, getQueryString, setQueryValues } from "../../../utils/urlState";
@@ -139,6 +140,13 @@ const filteredTable = computed(() => {
   if (!q) return rows;
   return rows.filter((r) => String(r.gene || "").toLowerCase().includes(q));
 });
+
+const tableColumns = computed(() => [
+  { key: "gene", label: "Gene", width: 140 },
+  { key: "mean", label: "Mean", width: 100 },
+  { key: "variance", label: "Var", width: 100 },
+  { key: "score", label: "Score", width: 120 },
+]);
 
 function sendToDE() {
   const genes = filteredTable.value.slice(0, 200).map((r) => r.gene);

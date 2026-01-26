@@ -33,17 +33,13 @@
         </el-button>
       </div>
 
-      <el-table :data="pageRows" stripe height="520" @row-click="openRow">
-        <el-table-column
-          v-for="c in tableColumns"
-          :key="c.key"
-          :prop="c.key"
-          :label="c.label"
-          :width="c.width"
-          :sortable="c.sortable"
-          :fixed="c.fixed"
-        />
-      </el-table>
+      <VirtualTable
+        :data="pageRows"
+        :columns="tableColumns"
+        :height="520"
+        row-key="Gene_Name"
+        @row-click="openRow"
+      />
 
       <div class="pager">
         <el-pagination
@@ -124,6 +120,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
 import EChart from "../../../components/EChart.vue";
+import VirtualTable from "../../../components/VirtualTable.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 import { buildBarOption, buildHeatmapOption } from "../shared/echartsKit";
 import { buildTableColumns, hashStringToUint32, makeGenomeRows, round } from "../../../api/showcaseAdapter";

@@ -51,13 +51,7 @@
           </div>
         </template>
         <el-input v-model="kw" placeholder="Search gene" clearable style="margin-bottom: 8px" />
-        <el-table :data="filtered" height="360" stripe>
-          <el-table-column prop="gene" label="Gene" width="140" />
-          <el-table-column prop="log2fc" label="log2FC" width="110" sortable />
-          <el-table-column prop="pval" label="p-value" width="120" sortable />
-          <el-table-column prop="padj" label="padj" width="120" sortable />
-          <el-table-column prop="baseMean" label="baseMean" />
-        </el-table>
+        <VirtualTable :data="filtered" :columns="tableColumns" :height="360" row-key="gene" />
       </el-card>
     </AsyncStateBlock>
   </div>
@@ -67,6 +61,7 @@
 import { computed, ref, watch } from "vue";
 import AsyncStateBlock from "../../../components/AsyncStateBlock.vue";
 import EChart from "../../../components/EChart.vue";
+import VirtualTable from "../../../components/VirtualTable.vue";
 import { getTranscriptomeDE } from "../../../api";
 import { buildMAOption, buildVolcanoOption } from "../shared/echartsKit";
 import { getQueryNumber, getQueryString, setQueryValues } from "../../../utils/urlState";
@@ -133,6 +128,14 @@ const filtered = computed(() => {
   if (!q) return table.value;
   return table.value.filter((r) => String(r.gene || "").toLowerCase().includes(q));
 });
+
+const tableColumns = computed(() => [
+  { key: "gene", label: "Gene", width: 140 },
+  { key: "log2fc", label: "log2FC", width: 110, sortable: true },
+  { key: "pval", label: "p-value", width: 120, sortable: true },
+  { key: "padj", label: "padj", width: 120, sortable: true },
+  { key: "baseMean", label: "baseMean", width: 140 },
+]);
 
 const volcanoOption = computed(() => {
   const points = table.value.map((r) => ({

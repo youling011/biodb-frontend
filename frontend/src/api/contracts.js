@@ -21,6 +21,7 @@ export const RowsResponseContract = {
   total: "number",
   limit: "number",
   offset: "number",
+  schema_version: "string",
 };
 
 export const TranscriptomeQCContract = {
@@ -63,4 +64,13 @@ export const MultiScreeningResponseContract = {
   feature_importance: "array",
   diff_table: "array",
   meta: "object",
+};
+
+export const JobStatusContract = {
+  id: "string|number",
+  status: "string",
+  progress: "number",
+  message: "string",
+  created_at: "string",
+  updated_at: "string",
 };
