@@ -169,7 +169,7 @@ export function useTranscriptomeDataset(sampleIdRef, activeRef) {
     }
   }
 
-  async function ensureRows({ limit = 5000, offset = 0, fields = "", sort_by = "", sort_dir = "", filter = "" } = {}) {
+  async function ensureRows({ limit = 5000, offset = 0 } = {}) {
     if (!sampleIdRef.value) return;
 
     // If we already have the first page and it covers total, do not refetch.
@@ -183,10 +183,6 @@ export function useTranscriptomeDataset(sampleIdRef, activeRef) {
         omics: "TRANSCRIPTOME",
         limit,
         offset,
-        fields,
-        sort_by,
-        sort_dir,
-        filter,
       });
 
       // Prefer new meta but keep existing fallback

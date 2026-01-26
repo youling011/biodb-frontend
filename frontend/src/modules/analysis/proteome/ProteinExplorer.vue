@@ -19,13 +19,17 @@
       <el-button @click="exportCsv" type="primary" plain>Export CSV</el-button>
     </div>
 
-    <VirtualTable
-      :data="pagedRows"
-      :columns="tableColumns"
-      :height="520"
-      row-key="Protein_ID"
-      @row-click="openDetail"
-    />
+    <el-table :data="pagedRows" stripe height="520" @row-click="openDetail">
+      <el-table-column prop="Protein_ID" label="Protein ID" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="Sequence_Length" label="Length" sortable width="110" />
+      <el-table-column prop="Molecular_Weight" label="MW" sortable width="110" />
+      <el-table-column prop="pI" label="pI" sortable width="90" />
+      <el-table-column prop="Net_Charge" label="Charge" sortable width="100" />
+      <el-table-column prop="GRAVY" label="GRAVY" sortable width="100" />
+      <el-table-column prop="Instability_Index" label="Instability" sortable width="130" />
+      <el-table-column prop="Aliphatic_Index" label="Aliphatic" sortable width="120" />
+      <el-table-column prop="Disulfide_Potential" label="Disulfide" sortable width="120" />
+    </el-table>
 
     <div class="pagination">
       <el-pagination
@@ -75,7 +79,6 @@
 <script setup>
 import { computed, ref } from "vue";
 import EChart from "../../../components/EChart.vue";
-import VirtualTable from "../../../components/VirtualTable.vue";
 import { exportObjectsToCsv } from "../../../utils/exportCsv";
 
 const props = defineProps({
@@ -91,18 +94,6 @@ const disulfideOnly = ref(false);
 
 const currentPage = ref(1);
 const pageSize = ref(50);
-
-const tableColumns = [
-  { key: "Protein_ID", label: "Protein ID", width: 160 },
-  { key: "Sequence_Length", label: "Length", width: 110, sortable: true },
-  { key: "Molecular_Weight", label: "MW", width: 110, sortable: true },
-  { key: "pI", label: "pI", width: 90, sortable: true },
-  { key: "Net_Charge", label: "Charge", width: 100, sortable: true },
-  { key: "GRAVY", label: "GRAVY", width: 100, sortable: true },
-  { key: "Instability_Index", label: "Instability", width: 130, sortable: true },
-  { key: "Aliphatic_Index", label: "Aliphatic", width: 120, sortable: true },
-  { key: "Disulfide_Potential", label: "Disulfide", width: 120, sortable: true },
-];
 
 const filteredRows = computed(() => {
   const q = search.value.trim().toLowerCase();
